@@ -145,15 +145,46 @@ int handle_client(char server_addr[16], int server_port) {
     }
     printf("Connected to the server successfully!\n");
 
-    // Receives data from server.
-    char response_buffer[4096];
-    client_receive_data(c, response_buffer, sizeof(response_buffer));
-    // Print received data.
-    printf("\nClient received from server: %s\n\n", response_buffer);
+    char command_buffer[32];
+    do {
 
-    char msg_buffer[4096] = "Hello server!";
-    client_send_data(c, msg_buffer, sizeof(msg_buffer));
-    printf("Message sent to server...\n\n");
+        printf("Enter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+        scanf(" %31[^\n]", command_buffer); // Scan for commands.
+
+        if(strcmp(command_buffer, "/check") == 0) {
+
+            printf("\nChecking for new messages...\n\n");
+
+            // Receives data from a client.
+            char response_buffer[4096];
+            client_receive_data(c, response_buffer, sizeof(response_buffer));
+            // Print received data.
+            printf("\nNew message from server: %s\n\n", response_buffer);
+
+            continue;
+        }
+
+        if(strcmp(command_buffer, "/send") == 0) {
+
+            printf("\nEnter the message:\n\n");
+
+            // Receives the message to be sent to the client.
+            char msg_buffer[4096];
+            scanf(" %4096[^\n]", msg_buffer);
+
+            // Sends the message to the client.
+            client_send_data(c, msg_buffer, sizeof(msg_buffer));
+            printf("\nMessage sent to server...\n\n");
+
+            continue;
+
+        }
+
+        if(strcmp(command_buffer, "/quit") == 0) {
+            break;
+        }
+
+    } while (strcmp(command_buffer, "/quit") != 0);
 
     // Deletes the client.
     client_delete(&c);
@@ -186,16 +217,48 @@ int handle_server(int server_port) {
     server_listen(s);
     printf("Client connected!\n\n");
 
-    // Sends a message to the client that connected.
-    char msg_buffer[4096] = "Hello client!";
-    server_send_data(s, msg_buffer, sizeof(msg_buffer));
-    printf("Message sent to client...\n");
+    char command_buffer[32];
+    do {
 
-    // Receives data from a client.
-    char response_buffer[4096];
-    server_receive_data(s, response_buffer, sizeof(response_buffer));
-    // Print received data.
-    printf("\nServer received from client: %s\n\n", response_buffer);
+        printf("Enter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+        scanf(" %31[^\n]", command_buffer); // Scan for commands.
+
+        if(strcmp(command_buffer, "/check") == 0) {
+
+            printf("\nChecking for new messages...\n\n");
+
+            // Receives data from a client.
+            char response_buffer[4096];
+            server_receive_data(s, response_buffer, sizeof(response_buffer));
+            // Print received data.
+            printf("\nNew message from client: %s\n\n", response_buffer);
+
+            continue;
+        }
+
+        if(strcmp(command_buffer, "/send") == 0) {
+
+            printf("\nEnter the message:\n\n");
+
+            // Receives the message to be sent to the client.
+            char msg_buffer[4096];
+            scanf(" %4096[^\n]", msg_buffer);
+
+            // Sends the message to the client.
+            server_send_data(s, msg_buffer, sizeof(msg_buffer));
+            printf("\nMessage sent to client...\n\n");
+
+            continue;
+
+        }
+
+        if(strcmp(command_buffer, "/quit") == 0) {
+            break;
+        }
+
+    } while (strcmp(command_buffer, "/quit") != 0);
+    
+    printf("\nClosing server...\n");
 
     // Deletes the server.
     server_delete(&s);
