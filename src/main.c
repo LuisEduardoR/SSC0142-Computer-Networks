@@ -1,7 +1,7 @@
 // Authors:
 // Abner Eduardo Silveira Santos - NUSP 10692012
 // João Pedro Uchôa Cavalcante - NUSP 10801169
-// Luís Eduardo Rozante de Freitas Pereira
+// Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
 # include "client/client.h"
 # include "server/server.h"
@@ -42,11 +42,15 @@ int main(void)
         }
         printf("Connected to the server successfully!\n");
 
-        // Receives data from a server.
+        // Receives data from server.
         char response_buffer[4096];
         client_receive_data(c, response_buffer, sizeof(response_buffer));
         // Print received data.
         printf("\nClient received from server: %s\n\n", response_buffer);
+
+        char msg_buffer[4096] = "Hello server!";
+        client_send_data(c, msg_buffer, sizeof(msg_buffer));
+        printf("Message sent to server...\n\n");
 
         // Deletes the client.
         client_delete(&c);
@@ -72,13 +76,19 @@ int main(void)
 
         // Listens and accepts for client connections, gets back the socket for the connected client.
         printf("\nListening for clients...\n");
-        int client_sckt = server_listen(s);
+        server_listen(s);
         printf("Client connected!\n\n");
 
         // Sends a message to the client that connected.
-        char msg_buffer[4096] = "Hello world";
-        server_send_data(client_sckt, msg_buffer, sizeof(msg_buffer));
-        printf("Message sent to client...\n\n");
+        char msg_buffer[4096] = "Hello client!";
+        server_send_data(s, msg_buffer, sizeof(msg_buffer));
+        printf("Message sent to client...\n");
+
+        // Receives data from a client.
+        char response_buffer[4096];
+        server_receive_data(s, response_buffer, sizeof(response_buffer));
+        // Print received data.
+        printf("\nServer received from client: %s\n\n", response_buffer);
 
         // Deletes the server.
         server_delete(&s);

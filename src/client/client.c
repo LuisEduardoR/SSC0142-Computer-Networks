@@ -1,7 +1,7 @@
 // Authors:
 // Abner Eduardo Silveira Santos - NUSP 10692012
 // João Pedro Uchôa Cavalcante - NUSP 10801169
-// Luís Eduardo Rozante de Freitas Pereira
+// Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
 # include "client.h"
 
@@ -53,10 +53,17 @@ int client_connect(client *c, char *s_addr, int port_number){
 
 }
 
-// Tries receiving data from a server and storing it on a buffer.
+// Tries receiving data from server and storing it on a buffer.
 char client_receive_data(client *c, char *response_buffer, int buffer_size) {
 
     recv(c->network_socket, response_buffer, buffer_size, 0);
+
+}
+
+// Sends data to server.
+void client_send_data(client *c, char *msg_buffer, int buffer_size) {
+
+    send(c->network_socket, msg_buffer, buffer_size, 0);
 
 }
 
