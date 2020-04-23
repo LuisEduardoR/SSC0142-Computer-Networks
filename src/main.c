@@ -15,6 +15,9 @@
 # define DEFAULT_ADDR "127.0.0.1"
 # define DEFAULT_PORT 9002
 
+// The maximum number of bytes that can be sent or received at once.
+# define MAX_BLOCK_SIZE 4096
+
 // Help texts.
 # define HELP_NO_PARAMETERS "\nusage: ./trabalho-redes [parameters]\n\nFor a list of parameters type \"./trabalho-redes --help\"\n"
 # define HELP_FULL "\nusage: ./trabalho-redes PARAMETERS\n\nYou can choose to connect as a client or as a server.\n\n\tTo connect as a client use:\n\t\t./trabalho-redes client (For default IP address and port)\n\t\t\tor\n\t\t./trabalho-redes client [IP adress] [port]\n\n\tTo connect as a server use:\n\t\t./trabalho-redes server (For default port)\n\t\t\tor\n\t\t./trabalho-redes server [port]\n"
@@ -148,18 +151,31 @@ int handle_client(char server_addr[16], int server_port) {
     char command_buffer[32];
     do {
 
-        printf("Enter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
-        scanf(" %31[^\n]", command_buffer); // Scan for commands.
+        printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+        scanf(" %31[^\n\r]", command_buffer); // Scan for commands.
 
         if(strcmp(command_buffer, "/check") == 0) {
 
-            printf("\nChecking for new messages...\n\n");
+            printf("\nChecking for new messages...\n");
 
-            // Receives data from a client.
-            char response_buffer[4096];
-            client_receive_data(c, response_buffer, sizeof(response_buffer));
-            // Print received data.
-            printf("\nNew message from server: %s\n\n", response_buffer);
+            // Receives data from the server. A buffer with appropriate size is allocated and must be freed later!
+            char *response_buffer = NULL;
+            int buffer_size = 0;
+            client_receive_data(c, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+
+            if(buffer_size > 0) {
+
+                // Print received data.
+                printf("\nNew message from server: %s\n", response_buffer);
+
+            } else {
+
+                printf("\nNo new messages avaliable!\n");
+
+            }
+
+            // Frees the memory used by the buffer.
+            free(response_buffer);
 
             continue;
         }
@@ -168,13 +184,16 @@ int handle_client(char server_addr[16], int server_port) {
 
             printf("\nEnter the message:\n\n");
 
-            // Receives the message to be sent to the client.
-            char msg_buffer[4096];
-            scanf(" %4096[^\n]", msg_buffer);
+            // Receives the message to be sent to the server. A buffer with appropriate size is allocated and must be freed later!
+            char *msg_buffer;
+            scanf(" %m[^\n\r]", &msg_buffer);
 
             // Sends the message to the client.
-            client_send_data(c, msg_buffer, sizeof(msg_buffer));
-            printf("\nMessage sent to server...\n\n");
+            client_send_data(c, msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+            printf("\nMessage sent to server...\n");
+
+            // Frees the memory used for the buffer.
+            free(msg_buffer);
 
             continue;
 
@@ -185,6 +204,8 @@ int handle_client(char server_addr[16], int server_port) {
         }
 
     } while (strcmp(command_buffer, "/quit") != 0);
+
+    printf("\nDisconnecting...\n\n");
 
     // Deletes the client.
     client_delete(&c);
@@ -215,23 +236,36 @@ int handle_server(int server_port) {
     // Listens and accepts for client connections, gets back the socket for the connected client.
     printf("\nListening for clients...\n");
     server_listen(s);
-    printf("Client connected!\n\n");
+    printf("Client connected!\n");
 
     char command_buffer[32];
     do {
 
-        printf("Enter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
-        scanf(" %31[^\n]", command_buffer); // Scan for commands.
+        printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+        scanf(" %31[^\n\r]", command_buffer); // Scan for commands.
 
         if(strcmp(command_buffer, "/check") == 0) {
 
-            printf("\nChecking for new messages...\n\n");
+            printf("\nChecking for new messages...\n");
 
-            // Receives data from a client.
-            char response_buffer[4096];
-            server_receive_data(s, response_buffer, sizeof(response_buffer));
-            // Print received data.
-            printf("\nNew message from client: %s\n\n", response_buffer);
+            // Receives data from a client. A buffer with appropriate size is allocated and must be freed later!
+            char *response_buffer = NULL;
+            int buffer_size = 0;
+            server_receive_data(s, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            
+            if(buffer_size > 0) {
+
+                // Print received data.
+                printf("\nNew message from client: %s\n", response_buffer);
+
+            } else {
+
+                printf("\nNo new messages avaliable!\n");
+
+            }
+
+            // Frees the memory used by the buffer.
+            free(response_buffer);
 
             continue;
         }
@@ -240,25 +274,28 @@ int handle_server(int server_port) {
 
             printf("\nEnter the message:\n\n");
 
-            // Receives the message to be sent to the client.
-            char msg_buffer[4096];
-            scanf(" %4096[^\n]", msg_buffer);
+            // Receives the message to be sent to the client. A buffer with appropriate size is allocated and must be freed later!
+            char *msg_buffer;
+            scanf(" %m[^\n\r]", &msg_buffer);
 
             // Sends the message to the client.
-            server_send_data(s, msg_buffer, sizeof(msg_buffer));
-            printf("\nMessage sent to client...\n\n");
+            server_send_data(s, msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+            printf("\nMessage sent to client...\n");
+
+            // Frees the memory used by the buffer.
+            free(msg_buffer);
 
             continue;
 
         }
-
+        break;
         if(strcmp(command_buffer, "/quit") == 0) {
             break;
         }
 
     } while (strcmp(command_buffer, "/quit") != 0);
     
-    printf("\nClosing server...\n");
+    printf("\nClosing server...\n\n");
 
     // Deletes the server.
     server_delete(&s);

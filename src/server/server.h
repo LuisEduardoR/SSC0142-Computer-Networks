@@ -17,9 +17,9 @@ int server_status(server *s);
 // Listens and accept incoming connections, return the socket from the incoming client.
 int server_listen(server *s);
 // Sends data to a client.
-void server_send_data(server *s, char *msg_buffer, int buffer_size);
+void server_send_data(server *s, char *msg_buffer, int buffer_size, int max_block_size);
 // Tries receiving data from client and storing it on a buffer.
-char server_receive_data(server *s, char *response_buffer, int buffer_size);
+void server_receive_data(server *s, char **response_buffer, int *buffer_size, int max_block_size);
 // Deletes the server, closing the socket and freeing memory.
 void server_delete(server **s);
 
