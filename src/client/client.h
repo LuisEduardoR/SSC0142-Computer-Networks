@@ -12,10 +12,8 @@ typedef struct CLIENT client;
 client *client_create();
 // Tries connecting to a server and returns the connection status.
 int client_connect(client *c, char *s_addr, int port_number);
-// Tries receiving data from a server and storing it on a buffer.
-void client_receive_data(client *c, char **response_buffer, int *buffer_size, int max_block_size);
-// Sends data to server.
-void client_send_data(client *c, char *msg_buffer, int buffer_size, int max_block_size);
+// Gets the client socket.
+int client_get_socket(client *c);
 // Deletes the client, closing the socket and freeing memory.
 void client_delete(client **c);
 

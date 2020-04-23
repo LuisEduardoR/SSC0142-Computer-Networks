@@ -5,6 +5,7 @@
 
 # include "client/client.h"
 # include "server/server.h"
+# include "messaging/messaging.h"
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -161,7 +162,7 @@ int handle_client(char server_addr[16], int server_port) {
             // Receives data from the server. A buffer with appropriate size is allocated and must be freed later!
             char *response_buffer = NULL;
             int buffer_size = 0;
-            client_receive_data(c, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            check_message(client_get_socket(c), &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
 
             if(buffer_size > 0) {
 
@@ -170,7 +171,8 @@ int handle_client(char server_addr[16], int server_port) {
 
             } else {
 
-                printf("\nNo new messages avaliable!\n");
+                printf("\nThe server was lost!\n");
+                break;
 
             }
 
@@ -189,7 +191,7 @@ int handle_client(char server_addr[16], int server_port) {
             scanf(" %m[^\n\r]", &msg_buffer);
 
             // Sends the message to the client.
-            client_send_data(c, msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+            send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
             printf("\nMessage sent to server...\n");
 
             // Frees the memory used for the buffer.
@@ -251,7 +253,7 @@ int handle_server(int server_port) {
             // Receives data from a client. A buffer with appropriate size is allocated and must be freed later!
             char *response_buffer = NULL;
             int buffer_size = 0;
-            server_receive_data(s, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            check_message(server_get_client_socket(s), &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
             
             if(buffer_size > 0) {
 
@@ -260,7 +262,8 @@ int handle_server(int server_port) {
 
             } else {
 
-                printf("\nNo new messages avaliable!\n");
+                printf("\nThe client has disconnected!\n");
+                break;
 
             }
 
@@ -279,7 +282,7 @@ int handle_server(int server_port) {
             scanf(" %m[^\n\r]", &msg_buffer);
 
             // Sends the message to the client.
-            server_send_data(s, msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+            send_message(server_get_client_socket(s), msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
             printf("\nMessage sent to client...\n");
 
             // Frees the memory used by the buffer.
@@ -288,7 +291,7 @@ int handle_server(int server_port) {
             continue;
 
         }
-        break;
+
         if(strcmp(command_buffer, "/quit") == 0) {
             break;
         }
