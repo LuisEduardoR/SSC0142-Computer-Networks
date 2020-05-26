@@ -8,6 +8,7 @@
 # include <stdlib.h>
 
 # include <string.h>
+# include <iostream>
 
 # include <sys/types.h>
 # include <sys/socket.h>
@@ -23,15 +24,14 @@ struct SERVER
     struct sockaddr_in server_adress;
     int server_status;
 
-    int client_socket;
-
+    std::vector<int> client_sockets;
 };
 
 // Creates a new server with a network socket and binds the socket.
 server *server_create(int port_number) { 
 
     // Allocates memory for the new server.
-    server *s = malloc(sizeof(server));
+    server *s = (server*)malloc(sizeof(server));
     if(s == NULL) // Verifies memory allocation error.
         return NULL;
 
@@ -57,10 +57,10 @@ int server_status(server *s) {
 
 }
 
-// Gets the socket of the connected client.
-int server_get_client_socket(server *s) {
+// Gets the sockets of the connected clients.
+std::vector<int> server_get_client_sockets(server *s) {
 
-    return s->client_socket;
+    return s->client_sockets;
 
 }
 
@@ -71,8 +71,13 @@ int server_listen(server *s) {
     listen(s->server_socket, BACKLOG_LEN);
 
     // Accepts the connection and returns the client socket.
-    s->client_socket = accept(s->server_socket, NULL, NULL);
+    int new_client = accept(s->server_socket, NULL, NULL);
+    s->client_sockets.push_back(new_client);
 
+    for(int i = 0; i < s->client_sockets.size(); i++)
+        printf("%i", s->client_sockets[i]);
+
+    return new_client;
 }
 
 // Deletes the server, closing the socket and freeing memory.

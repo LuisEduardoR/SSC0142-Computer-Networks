@@ -28,7 +28,7 @@ struct CLIENT
 client *client_create() { 
 
     // Allocates memory for the new client.
-    client *c = malloc(sizeof(client));
+    client *c = (client*)malloc(sizeof(client));
     if(c == NULL) // Verifies memory allocation error.
         return NULL;
 

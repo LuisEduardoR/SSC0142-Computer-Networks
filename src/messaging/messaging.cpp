@@ -32,7 +32,7 @@ void send_message(int socket, char *send_buffer, int buffer_size, int max_block_
 // Tries receiving data from a socket and storing it on a buffer.
 void check_message(int socket, char **response_buffer, int *buffer_size, int max_block_size) {
 
-    char *temp_buffer = malloc(max_block_size * sizeof(char));
+    char *temp_buffer = (char*)malloc(max_block_size * sizeof(char));
     int bytes_received = 0;
     while (1)
     {
@@ -55,7 +55,7 @@ void check_message(int socket, char **response_buffer, int *buffer_size, int max
         }
 
         // Realocates the final buffer.
-        *response_buffer = realloc(*response_buffer, (bytes_received + received_now) * sizeof(char));
+        *response_buffer = (char*)realloc(*response_buffer, (bytes_received + received_now) * sizeof(char));
 
         // Copies the data to the permanent buffer.
         memcpy((*response_buffer) + bytes_received, temp_buffer, received_now);

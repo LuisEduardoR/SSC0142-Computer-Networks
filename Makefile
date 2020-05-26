@@ -1,9 +1,9 @@
-FILES = ./src/main.c ./src/client/client.c ./src/server/server.c ./src/messaging/messaging.c
+FILES = ./src/main.cpp ./src/client/client.cpp ./src/server/server.cpp ./src/messaging/messaging.cpp
 OUTPUT = trabalho-redes
 
 all:
 
-	gcc -o $(OUTPUT) $(FILES)
+	g++ -pthread -o $(OUTPUT) $(FILES)
 
 run:
 

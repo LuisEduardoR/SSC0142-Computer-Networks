@@ -7,10 +7,13 @@
 # include "server/server.h"
 # include "messaging/messaging.h"
 
+# include "pthread.h"
 # include <stdio.h>
 # include <stdlib.h>
 
 # include <string.h>
+# include <iostream>
+# include <vector>
 
 // Default values.
 # define DEFAULT_ADDR "127.0.0.1"
@@ -30,8 +33,17 @@ enum TYPE { CLIENT, SERVER };
 
 // Functions to handle the different types of instances this program can have.
 // Declared bellow the main function.
-int handle_client(char server_addr[16], int server_port);
-int handle_server(int server_port);
+int client_application(char server_addr[16], int server_port);
+int server_application(int server_port);
+
+void* handle_client(void* client);
+
+// Struct for the connection, so that we can pass it as an argument to the handle_client threads
+typedef struct CONNECTION
+{
+    server *server_instance;
+    int client_socket;
+} connection;
 
 
 // Program main function.
@@ -92,7 +104,7 @@ int main(int argc, char* argv[])
         }
 
         // Calls a function to handle the client.
-        return handle_client(server_addr, server_port);
+        return client_application(server_addr, server_port);
 
     } else if(instance_type == SERVER) { // Handles the server.
 
@@ -114,7 +126,7 @@ int main(int argc, char* argv[])
         }
 
         // Calls a function to handle the server.
-        handle_server(server_port);
+        server_application(server_port);
 
     } else { // Don't do anything for other parameters.
         
@@ -126,7 +138,7 @@ int main(int argc, char* argv[])
 
 }
 
-int handle_client(char server_addr[16], int server_port) {
+int client_application(char server_addr[16], int server_port) {
 
     // Creates the client.
     printf("\nCreating new client...\n");
@@ -216,7 +228,7 @@ int handle_client(char server_addr[16], int server_port) {
 
 }
 
-int handle_server(int server_port) {
+int server_application(int server_port) {
 
     // Creates the server.
     printf("\nCreating server at port %d...\n", server_port);
@@ -235,74 +247,130 @@ int handle_server(int server_port) {
     }
     printf("Server created successfully!\n");
 
-    // Listens and accepts for client connections, gets back the socket for the connected client.
-    printf("\nListening for clients...\n");
-    server_listen(s);
-    printf("Client connected!\n");
+    while(true)
+    {
+        connection* new_connection = (connection*)malloc(sizeof(connection));
 
-    char command_buffer[32];
-    do {
+        // Listens and accepts for client connections, gets back the socket for the connected client.
+        printf("\nListening for clients...\n");
+        new_connection->client_socket = server_listen(s);
+        new_connection->server_instance = s;
 
-        printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
-        scanf(" %31[^\n\r]", command_buffer); // Scan for commands.
+        printf("Client connected!\n");
+        pthread_t thread;
+        pthread_create(&thread, NULL, handle_client, (void*)new_connection);
+    }
+}
 
-        if(strcmp(command_buffer, "/check") == 0) {
+void* handle_client(void* connect)
+{
+    connection* client_connection = (connection*)(connect);
+    
+    char fodasse[7] = "oimano";
+    send_message(client_connection->client_socket, fodasse, 7, MAX_BLOCK_SIZE);
 
-            printf("\nChecking for new messages...\n");
+    while(true) {
+        
+        printf("\nChecking for new messages...\n");
 
-            // Receives data from a client. A buffer with appropriate size is allocated and must be freed later!
-            char *response_buffer = NULL;
-            int buffer_size = 0;
-            check_message(server_get_client_socket(s), &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
-            
-            if(buffer_size > 0) {
+        // Receives data from a client. A buffer with appropriate size is allocated and must be freed later!
+        char *response_buffer = NULL;
+        int buffer_size = 0;
+        check_message(client_connection->client_socket, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+        
+        if(buffer_size > 0) {
 
-                // Print received data.
-                printf("\nNew message from client: %s\n", response_buffer);
+            // Print received data.
+            printf("\nNew message from client: %s\n", response_buffer);
 
-            } else {
-
-                printf("\nThe client has disconnected!\n");
-                break;
-
+            std::vector<int> connected_clients = server_get_client_sockets(client_connection->server_instance);
+            for(int i = 0; i < connected_clients.size(); i++)
+            {
+                printf("Sendind message to: %d\n", connected_clients[i]);
+                send_message(connected_clients[i], response_buffer, 1 + strlen(response_buffer), MAX_BLOCK_SIZE);
             }
 
-            // Frees the memory used by the buffer.
-            free(response_buffer);
+        } else {
 
-            continue;
-        }
-
-        if(strcmp(command_buffer, "/send") == 0) {
-
-            printf("\nEnter the message:\n\n");
-
-            // Receives the message to be sent to the client. A buffer with appropriate size is allocated and must be freed later!
-            char *msg_buffer;
-            scanf(" %m[^\n\r]", &msg_buffer);
-
-            // Sends the message to the client.
-            send_message(server_get_client_socket(s), msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
-            printf("\nMessage sent to client...\n");
-
-            // Frees the memory used by the buffer.
-            free(msg_buffer);
-
-            continue;
-
-        }
-
-        if(strcmp(command_buffer, "/quit") == 0) {
+            printf("\nThe client has disconnected!\n");
             break;
+
         }
 
-    } while (strcmp(command_buffer, "/quit") != 0);
-    
-    printf("\nClosing server...\n\n");
+        // Frees the memory used by the buffer.
+        free(response_buffer);
 
-    // Deletes the server.
-    server_delete(&s);
-
-    return 0;
-
+        continue;
+        
+    }
 }
+
+// void* handle_client(void* connect)
+// {
+//     connection* client_connection = (connection*)(connect);
+//     char command_buffer[32];
+//     do {
+
+//         printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+//         scanf(" %31[^\n\r]", command_buffer); // Scan for commands.
+
+//         if(strcmp(command_buffer, "/check") == 0) {
+
+//             printf("\nChecking for new messages...\n");
+
+//             // Receives data from a client. A buffer with appropriate size is allocated and must be freed later!
+//             char *response_buffer = NULL;
+//             int buffer_size = 0;
+//             check_message(server_get_client_socket(s), &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            
+//             if(buffer_size > 0) {
+
+//                 // Print received data.
+//                 printf("\nNew message from client: %s\n", response_buffer);
+
+//             } else {
+
+//                 printf("\nThe client has disconnected!\n");
+//                 break;
+
+//             }
+
+//             // Frees the memory used by the buffer.
+//             free(response_buffer);
+
+//             continue;
+//         }
+
+//         if(strcmp(command_buffer, "/send") == 0) {
+
+//             printf("\nEnter the message:\n\n");
+
+//             // Receives the message to be sent to the client. A buffer with appropriate size is allocated and must be freed later!
+//             char *msg_buffer;
+//             scanf(" %m[^\n\r]", &msg_buffer);
+
+//             // Sends the message to the client.
+//             send_message(server_get_client_socket(s), msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+//             printf("\nMessage sent to client...\n");
+
+//             // Frees the memory used by the buffer.
+//             free(msg_buffer);
+
+//             continue;
+
+//         }
+
+//         if(strcmp(command_buffer, "/quit") == 0) {
+//             break;
+//         }
+
+//     } while (strcmp(command_buffer, "/quit") != 0);
+    
+//     printf("\nClosing server...\n\n");
+
+//     // Deletes the server.
+//     server_delete(&client_connection->server_instance);
+
+//     return 0;
+
+// }
