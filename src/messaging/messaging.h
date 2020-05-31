@@ -12,6 +12,6 @@
 // Sends data to a socket.
 void send_message(int socket, char *send_buffer, int buffer_size, int max_block_size);
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, char **receive_buffer, int *buffer_size, int max_block_size);
+void check_message(int socket, int* status, char **receive_buffer, int *buffer_size, int max_block_size);
 
 # endif

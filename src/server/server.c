@@ -50,6 +50,7 @@ void *handle_client(void* client);
 void *handle_connections(void *s);
 void close_server();
 client_connection *server_listen(server *s);
+void remove_client(client_connection *connection);
 
 // Creates a new server with a network socket and binds the socket.
 server *server_create(int port_number) { 
@@ -118,6 +119,8 @@ void *handle_connections(void *s) {
 
         // ENTER CRITICAL REGION =======================================
 
+        fprintf(stderr, "Client just connected with socket  %d!\n", new_connection->client_socket);
+
         // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
         serv->client_connections = (client_connection**)realloc(serv->client_connections, sizeof(client_connection*) * (serv->client_connections_count + 1));
         serv->client_connections[serv->client_connections_count] = new_connection;
@@ -142,41 +145,53 @@ void *handle_client(void* connect)
 {
 
     // Sends an welcome message to the joining client.
-    client_connection* client_connec = (client_connection*)(connect);
-    send_message(client_connec->client_socket, "Welcome!", 9, MAX_BLOCK_SIZE);
+    client_connection* client_connect = (client_connection*)(connect);
+    send_message(client_connect->client_socket, "Welcome!", 9, MAX_BLOCK_SIZE);
 
     while(1) {
 
         // Checks for data from the client. A buffer with appropriate size is allocated and must be freed later!
+        int status = 0;
         char *response_buffer = NULL;
         int buffer_size = 0;
-        check_message(client_connec->client_socket, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+        check_message(client_connect->client_socket, &status, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
         
         // Redirects the message to the other clients.
-        if(buffer_size > 0) {
+        if(status == 0) { // A message was received and must be redirected.
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            sem_wait(&(client_connec->server_instance->updating_connections));
+            sem_wait(&(client_connect->server_instance->updating_connections));
 
             // ENTER CRITICAL REGION =======================================
 
             // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-            for(int i = 0; i < client_connec->server_instance->client_connections_count; i++) {
-                if(client_connec->server_instance->client_connections[i] != client_connec)
-                    send_message(client_connec->server_instance->client_connections[i]->client_socket, response_buffer, 1 + strlen(response_buffer), MAX_BLOCK_SIZE);
+            for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
+                if(client_connect->server_instance->client_connections[i] != client_connect)
+                    send_message(client_connect->server_instance->client_connections[i]->client_socket, response_buffer, 1 + strlen(response_buffer), MAX_BLOCK_SIZE);
             }
 
             // EXIT CRITICAL REGION ========================================
 
             // Exits the critical region, and opens the semaphore.
-            sem_post(&(client_connec->server_instance->updating_connections));
+            sem_post(&(client_connect->server_instance->updating_connections));
 
+        } else if(status == 1) { // No new messages from this client.
+            // If there are no messages nothing is done.
+        } else if(status == -1) { // The client has disconnected.
+            break; // Exits the thread.
+        } else { // An error has happened.
+            fprintf(stderr, "ERROR %d!\n", status);
         }
+        
 
         // Frees the memory used by the buffer.
         free(response_buffer);
         
     }
+
+    // Disconnects the client before exiting this thread.
+    remove_client(client_connect); 
+
 }
 
 // Listen and accept incoming connections, return the socket from the incoming client.
@@ -194,6 +209,42 @@ client_connection *server_listen(server *s) {
     new_connection->server_instance = s;
 
     return new_connection;
+}
+
+// Removes a client that has disconnected from the server.
+void remove_client(client_connection *connection) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    sem_wait(&(connection->server_instance->updating_connections));
+
+    // ENTER CRITICAL REGION =======================================
+
+    fprintf(stderr, "Client with socket %d disconnected!\n", connection->client_socket);
+
+    // Finds the connection that 
+    int found_connection = 0;
+    for(int i = 0; i < connection->server_instance->client_connections_count; i++) {
+
+        if(found_connection) { // If the connection was found removes it,, and shifts the pointers after it.
+            connection->server_instance->client_connections[i-1] = connection->server_instance->client_connections[i];
+        } else if(connection->server_instance->client_connections[i] == connection) {
+            found_connection = 1;
+        }
+
+    }
+
+    // Re-sizes the connection list.
+    connection->server_instance->client_connections_count--;
+    connection->server_instance->client_connections = (client_connection**)realloc(connection->server_instance->client_connections, sizeof(client_connection*) * (connection->server_instance->client_connections_count));
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    sem_post(&(connection->server_instance->updating_connections));
+
+    // Frees the current connection.
+    free(connection);
+
 }
 
 // Closes the server.

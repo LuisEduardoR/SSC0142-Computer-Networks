@@ -78,14 +78,19 @@ void client_handle(client* c) {
             printf("\nChecking for new messages...\n");
 
             // Receives data from the server. A buffer with appropriate size is allocated and must be freed later!
+            int status = 0;
             char *response_buffer = NULL;
             int buffer_size = 0;
-            check_message(client_get_socket(c), &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            check_message(client_get_socket(c), &status, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
 
-            if(buffer_size > 0) {
+            if(status == 0) {
 
                 // Print received data.
                 printf("\nNew message from server: %s\n", response_buffer);
+
+            } else if (status == 1) {
+
+                printf("\nNo new messages!\n");
 
             } else {
 

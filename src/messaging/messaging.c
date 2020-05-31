@@ -4,6 +4,8 @@
 
 # include <string.h>
 
+#include <fcntl.h>
+
 # include <sys/types.h>
 # include <sys/socket.h>
 
@@ -30,8 +32,14 @@ void send_message(int socket, char *send_buffer, int buffer_size, int max_block_
 }
 
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, char **response_buffer, int *buffer_size, int max_block_size) {
+void check_message(int socket, int *status, char **response_buffer, int *buffer_size, int max_block_size) {
 
+    // Ensures the socket is set to non-blocking.
+    int flags = fcntl(socket, F_GETFL);
+    flags |= O_NONBLOCK;
+    fcntl(socket, F_SETFL, flags);
+
+    // Receives the message.
     char *temp_buffer = (char*)malloc(max_block_size * sizeof(char));
     int bytes_received = 0;
     while (1)
@@ -43,13 +51,17 @@ void check_message(int socket, char **response_buffer, int *buffer_size, int max
         // Handles no data received.
         if(received_now < 1) {
 
-            // If recv returns 0 it means the connection was closed.
-            if(bytes_received == 0) {
-
+            if(received_now == 0) { // The server or client has disconnected in a ordenerly way.
+                *status = -1;
                 *response_buffer = NULL;
                 *buffer_size = 0;
                 break;
 
+            } else if(bytes_received == 0) { // No new message.
+                *status = 1;
+                *response_buffer = NULL;
+                *buffer_size = 0;
+                break;
             }
 
         }
