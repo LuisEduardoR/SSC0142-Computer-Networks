@@ -3,7 +3,7 @@ OUTPUT = trabalho-redes
 
 all:
 
-	gcc -pthread -o $(OUTPUT) $(FILES)
+	gcc -lpthread -lrt -o $(OUTPUT) $(FILES)
 
 run:
 

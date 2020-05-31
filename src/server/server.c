@@ -10,6 +10,8 @@
 # include <stdlib.h>
 # include <string.h>
 
+# include <signal.h>
+# include <semaphore.h>
 # include <pthread.h>
 
 # include <sys/types.h>
@@ -26,6 +28,7 @@ typedef struct CLIENT_CONNECTION
 
     server *server_instance;
     int client_socket;
+    pthread_t thread;
 
 } client_connection;
 
@@ -36,6 +39,7 @@ struct SERVER
     struct sockaddr_in server_adress;
     int server_status;
 
+    sem_t updating_connections;
     client_connection **client_connections;
     int client_connections_count;
 
@@ -84,6 +88,10 @@ int server_status(server *s) {
 // Handles the server instance (control of the program is given to the server until it finishes).
 void server_handle(server* s) {
 
+    // Sets the server to be closed when CTRL+C is pressed.
+    signal(SIGINT, close_server);
+
+    // Creates a thread to handle new connections.
     pthread_t connection_thread;
     pthread_create(&connection_thread, NULL, handle_connections, (void*)s);
 
@@ -96,22 +104,37 @@ void *handle_connections(void *s) {
     // Stores the server pointer.
     server *serv = (server*)s;
 
+    // Initializes the semaphore used to protect the connections array.
+    sem_init(&(serv->updating_connections), 0, 1);
+
     while(1)
     {
 
         // Listens for new connection.
         client_connection *new_connection = server_listen(serv);
 
-        // Adds the new connection to the list.
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        sem_wait(&(serv->updating_connections));
+
+        // ENTER CRITICAL REGION =======================================
+
+        // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
         serv->client_connections = (client_connection**)realloc(serv->client_connections, sizeof(client_connection*) * (serv->client_connections_count + 1));
         serv->client_connections[serv->client_connections_count] = new_connection;
         serv->client_connections_count++;
 
+        // EXIT CRITICAL REGION ========================================
+
+        // Exits the critical region, and opens the semaphore.
+        sem_post(&(serv->updating_connections));
+
         // Handles the new connection client.
-        pthread_t thread;
-        pthread_create(&thread, NULL, handle_client, (void*)new_connection);
+        pthread_create(&(new_connection->thread), NULL, handle_client, (void*)new_connection);
 
     }
+
+    // Destroys the semaphore after it's not needed anymore.
+    sem_destroy(&(serv->updating_connections));
 
 }
 
@@ -131,10 +154,23 @@ void *handle_client(void* connect)
         
         // Redirects the message to the other clients.
         if(buffer_size > 0) {
+
+            // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+            sem_wait(&(client_connec->server_instance->updating_connections));
+
+            // ENTER CRITICAL REGION =======================================
+
+            // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
             for(int i = 0; i < client_connec->server_instance->client_connections_count; i++) {
                 if(client_connec->server_instance->client_connections[i] != client_connec)
                     send_message(client_connec->server_instance->client_connections[i]->client_socket, response_buffer, 1 + strlen(response_buffer), MAX_BLOCK_SIZE);
             }
+
+            // EXIT CRITICAL REGION ========================================
+
+            // Exits the critical region, and opens the semaphore.
+            sem_post(&(client_connec->server_instance->updating_connections));
+
         }
 
         // Frees the memory used by the buffer.
@@ -158,6 +194,11 @@ client_connection *server_listen(server *s) {
     new_connection->server_instance = s;
 
     return new_connection;
+}
+
+// Closes the server.
+void close_server() {
+
 }
 
 // Deletes the server, closing the socket and freeing memory.
