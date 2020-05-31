@@ -14,6 +14,8 @@ client *client_create();
 int client_connect(client *c, char *s_addr, int port_number);
 // Gets the client socket.
 int client_get_socket(client *c);
+// Handles the client instance (control of the program is given to the client until it disconnects).
+void client_handle(client* c);
 // Deletes the client, closing the socket and freeing memory.
 void client_delete(client **c);
 

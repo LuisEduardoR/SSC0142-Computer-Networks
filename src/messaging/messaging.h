@@ -6,6 +6,9 @@
 # ifndef MESSAGING_H
 # define MESSAGING_H
 
+// The maximum number of bytes that can be sent or received at once.
+# define MAX_BLOCK_SIZE 4096
+
 // Sends data to a socket.
 void send_message(int socket, char *send_buffer, int buffer_size, int max_block_size);
 // Tries receiving data from a socket and storing it on a buffer.
