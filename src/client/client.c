@@ -87,7 +87,11 @@ void client_handle(client* c) {
     char command_buffer[32];
     do {
 
-        printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
+        printf("\nEnter a command:\n\n");
+        printf("\t/check\t-\tChecks for new messages\n");
+        printf("\t/send\t-\tSend a message\n");
+        printf("\t/ping\t-\tThe server answers \"pong\"\n");
+        printf("\t/quit\t-\tClose the connection and exit the program\n\n");
         if(scanf(" %31[^\n\r]", command_buffer) == EOF) { // Scan for commands, finishes the program on EOF.
             CLOSE_CLIENT_FLAG = 1;
             continue;
@@ -106,7 +110,8 @@ void client_handle(client* c) {
             if(status == 0) {
 
                 // Print received data.
-                printf("\nNew message from server: %s\n", response_buffer);
+                printf("\nNew messages available:\n\n");
+                printf("%s\n", response_buffer);
 
             } else if (status == 1) {
 
@@ -133,13 +138,22 @@ void client_handle(client* c) {
             char *msg_buffer;
             scanf(" %m[^\n\r]", &msg_buffer);
 
-            // Sends the message to the client.
+            // Sends the message to the server to be redirected to the other clients.
             send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer));
             printf("\nMessage sent to server...\n");
 
             // Frees the memory used for the buffer.
             free(msg_buffer);
 
+            continue;
+
+        }
+
+
+        if(strcmp(command_buffer, "/ping") == 0) {
+
+            // Sends the the /ping command to the client, use /check to see if "pong" was received.
+            send_message(client_get_socket(c), "/ping", 6);
             continue;
 
         }

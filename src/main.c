@@ -20,9 +20,9 @@
 
 // Help texts.
 # define HELP_NO_PARAMETERS "\nusage: ./trabalho-redes [parameters]\n\nFor a list of parameters type \"./trabalho-redes --help\"\n"
-# define HELP_FULL "\nusage: ./trabalho-redes PARAMETERS\n\nYou can choose to connect as a client or as a server.\n\n\tTo connect as a client use:\n\t\t./trabalho-redes client (For default IP address and port)\n\t\t\tor\n\t\t./trabalho-redes client [IP adress] [port]\n\n\tTo connect as a server use:\n\t\t./trabalho-redes server (For default port)\n\t\t\tor\n\t\t./trabalho-redes server [port]\n"
-# define HELP_CLIENT "\nusage:\n./trabalho-redes client (For default IP address and port)\n\tor\n./trabalho-redes client [IP adress] [port]\n"
-# define HELP_SERVER "\nusage:\n./trabalho-redes server (For default port)\n\tor\n\t\t./trabalho-redes server [port]\n"
+# define HELP_FULL "\nusage: ./trabalho-redes PARAMETERS\n\nYou can choose to connect as a client or as a server.\n\n\tTo connect as a client use:\n\t\t./trabalho-redes client\n\n\tTo connect as a server use:\n\t\t./trabalho-redes server (For default port)\n\t\t\tor\n\t\t./trabalho-redes server [port]\n"
+# define HELP_CLIENT "\nusage:\n./trabalho-redes client\n"
+# define HELP_SERVER "\nusage:\n./trabalho-redes server (For default port)\n\tor\n./trabalho-redes server [port]\n"
 
 // Types of program instances.
 enum TYPE { CLIENT, SERVER };
@@ -61,56 +61,83 @@ int main(int argc, char* argv[])
         int server_port;
 
         // Checks for the client parameters.
-        if(argc == 2) { // If no additional parameters were provided use the default ones.
-
-            strcpy(server_addr, DEFAULT_ADDR);
-            server_port = DEFAULT_PORT;
-
-        } else if (argc == 4) { // If an IP address and a port were provided use them instead.
-
-            // Checks if the IP address is valid.
-            if(strlen(argv[2]) > strlen("xxx.xxx.xxx.xxx")) {
-
-                fprintf(stderr, "\nInvalid IP adress lenght!\n\n");
-                return -1;
-            }
-
-            // Uses the provided parameters.
-            strcpy(server_addr, argv[2]);
-            server_port = atoi(argv[3]);
-
-        } else { // Displays help text if the number of parameters is invalid.
+        if(argc != 2) { // If unnecessary parameters were provided use prints a hel message.
             printf("%s\n", HELP_CLIENT);
             return 0;
         }
 
-        // Creates the client.
-        printf("\nCreating new client...\n");
-        client *c = client_create();
-        // Checks for errors creating the client.
-        if(c == NULL) {
-            fprintf(stderr, "Error creating new client! (-1)\n\n");
-            return -1;
-        }
-        printf("Client created successfully!\n");
+        // Receives the commands for the client.
+        char command_buffer[16];
+        do {
 
-        // Connects to the server.
-        printf("\nAttempting connection to server (%s:%d)...\n", server_addr, server_port);
-        int cnct_status = client_connect(c, server_addr, server_port);
-        // Checks for errors.
-        if(cnct_status < 0) {
-            fprintf(stderr, "Error connecting to remote socket! (%d)\n\n", cnct_status);
-            client_delete(&c);
-            return cnct_status;
-        }
-        printf("Connected to the server successfully!\n");
+            printf("\nEnter a command:\n\n\t/connect\t-\tConnect to a server\n\t/quit\t\t-\tExit the program\n\n");
+            if(scanf(" %15[^\n\r]", command_buffer) == EOF) { // Scan for commands, finishes the program on EOF.
+                putchar('\n');
+                return 0;
+            }
 
-        // Handles the client execution until it's disconnected.
-        client_handle(c);
+            // Start the server connection process.
+            if(strcmp(command_buffer, "/connect") == 0) {
+                
+                printf("\nEnter the server address (default: %s)\n\n", DEFAULT_ADDR);
+                if(scanf(" %15[^\n\r]", command_buffer) == EOF) { // Scan for commands, finishes the program on EOF.
+                    putchar('\n');
+                    return 0;
+                }
 
-        // Deletes the client.
-        printf("\nDisconnected!\n\n");
-        client_delete(&c);
+                if(strcmp(command_buffer, "default") == 0) // Uses the default address.
+                    strcpy(server_addr, DEFAULT_ADDR);
+                else // Uses the provided address.
+                    strcpy(server_addr, command_buffer);
+
+                printf("\nEnter the server port (default: %d)\n\n", DEFAULT_PORT);
+                if(scanf(" %15[^\n\r]", command_buffer) == EOF) { // Scan for commands, finishes the program on EOF.
+                    putchar('\n');
+                    return 0;
+                }
+
+                if(strcmp(command_buffer, "default") == 0) // Uses the default port.
+                    server_port = DEFAULT_PORT;
+                else // Uses the provided port.
+                    server_port = atoi(command_buffer);
+
+                // Creates the client.
+                printf("\nCreating new client...\n");
+                client *c = client_create();
+                // Checks for errors creating the client.
+                if(c == NULL) {
+                    fprintf(stderr, "Error creating new client! (-1)\n\n");
+                    return -1;
+                }
+                printf("Client created successfully!\n");
+
+                // Connects to the server.
+                printf("\nAttempting connection to server (%s:%d)...\n", server_addr, server_port);
+                int cnct_status = client_connect(c, server_addr, server_port);
+                // Checks for errors.
+                if(cnct_status < 0) {
+                    fprintf(stderr, "Error connecting to remote socket! (%d)\n\n", cnct_status);
+                    client_delete(&c);
+                    return cnct_status;
+                }
+                printf("Connected to the server successfully!\n");
+
+                // Handles the client execution until it's disconnected.
+                client_handle(c);
+
+                // Deletes the client.
+                printf("\nDisconnected!\n\n");
+                client_delete(&c);
+
+                // Exits the program.
+                return 0;
+            }
+
+            if(strcmp(command_buffer, "/quit") == 0) {
+                return 0;
+            }
+
+        } while (1);
 
     } else if(instance_type == SERVER) { // Handles the server.
 

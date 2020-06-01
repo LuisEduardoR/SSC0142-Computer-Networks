@@ -140,7 +140,7 @@ void *handle_connections(void *s) {
 
             // ENTER CRITICAL REGION =======================================
 
-            fprintf(stderr, "Client just connected with socket  %d!\n", new_connection->client_socket);
+            fprintf(stderr, "Client just connected with socket %d!\n", new_connection->client_socket);
 
             // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
             serv->client_connections = (client_connection**)realloc(serv->client_connections, sizeof(client_connection*) * (serv->client_connections_count + 1));
@@ -166,9 +166,13 @@ void *handle_connections(void *s) {
 void *handle_client(void* connect)
 {
 
-    // Sends an welcome message to the joining client.
+    // Gets a reference to the client handled by this thread.
     client_connection* client_connect = (client_connection*)(connect);
-    send_message(client_connect->client_socket, "Welcome!", 9);
+
+    // Sends a welcome message to the client joining the chat.
+    char welcome_msg_buffer[53];
+    sprintf(welcome_msg_buffer, "server: Welcome %d!", client_connect->client_socket);
+    send_message(client_connect->client_socket, welcome_msg_buffer, strlen(welcome_msg_buffer) + 1);
 
     while(!CLOSE_SERVER_FLAG) {
 
@@ -186,10 +190,34 @@ void *handle_client(void* connect)
 
             // ENTER CRITICAL REGION =======================================
 
-            // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-            for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
-                if(client_connect->server_instance->client_connections[i] != client_connect)
-                    send_message(client_connect->server_instance->client_connections[i]->client_socket, response_buffer, 1 + strlen(response_buffer));
+            if(strcmp(response_buffer, "/ping") == 0) { // Detects the ping command.
+
+                // Sends pong back to the client.
+                send_message(client_connect->client_socket, "server: pong", 13);
+
+            } else { // I fno command is detected, it's a regular message that needs to be sent to others.
+
+                // Adds the socket from the client who sent the message to it's start.
+                char nickname_buffer[53];
+                sprintf(nickname_buffer, "%d: ", client_connect->client_socket);
+
+                // Creates a new buffer to store the nickname and the message.
+                int total_send_size = strlen(nickname_buffer) + strlen(response_buffer) + 1;
+                char *sending_buffer = malloc(sizeof(char) * total_send_size);
+
+                // Constructs the message to be sent.
+                strcpy(sending_buffer, nickname_buffer);
+                strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
+
+                // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
+                for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
+                    if(client_connect->server_instance->client_connections[i] != client_connect)
+                        send_message(client_connect->server_instance->client_connections[i]->client_socket, sending_buffer, total_send_size);
+                }
+
+                // Frees the buffer used for the sent message.
+                free(sending_buffer);
+
             }
 
             // EXIT CRITICAL REGION ========================================
@@ -203,10 +231,9 @@ void *handle_client(void* connect)
             break; // Exits the thread.
         } else { // An error has happened.
             fprintf(stderr, "ERROR %d!\n", status);
-        }
-        
+        }   
 
-        // Frees the memory used by the buffer.
+        // Frees the memory used by the buffers.
         free(response_buffer);
         
     }
