@@ -11,6 +11,8 @@
 # include <stdio.h>
 # include <string.h>
 
+# include <signal.h>
+
 # include <sys/types.h>
 # include <sys/socket.h>
 
@@ -19,12 +21,24 @@
 
 #include <unistd.h>
 
+// Used to indicate when the client should be closed.
+int CLOSE_CLIENT_FLAG = 0;
+
 struct CLIENT
 {
     int network_socket;
     struct sockaddr_in server_adress;
     int connection_status;
 };
+
+// Used to make the client no close on a CTRL + C;
+void ignore_sigint() {
+
+    // Prints a message and resets the signal.
+    printf("\nUse the /quit command or input EOF (CTRL+D) to exit!\n");
+    signal(SIGINT, ignore_sigint);
+
+}
 
 // Creates a new client with a network socket.
 client *client_create() { 
@@ -67,11 +81,17 @@ int client_get_socket(client *c) {
 // Handles the client instance (control of the program is given to the client until it disconnects).
 void client_handle(client* c) {
 
+    // Sets the client to ignore SIGINT displaying a mesage instead.
+    signal(SIGINT, ignore_sigint);
+
     char command_buffer[32];
     do {
 
         printf("\nEnter a command:\n\n\t/check\t-\tChecks for new messages\n\t/send\t-\tSend a message\n\t/quit\t-\tClose the connection and exit the program\n\n");
-        scanf(" %31[^\n\r]", command_buffer); // Scan for commands.
+        if(scanf(" %31[^\n\r]", command_buffer) == EOF) { // Scan for commands, finishes the program on EOF.
+            CLOSE_CLIENT_FLAG = 1;
+            continue;
+        }
 
         if(strcmp(command_buffer, "/check") == 0) {
 
@@ -81,7 +101,7 @@ void client_handle(client* c) {
             int status = 0;
             char *response_buffer = NULL;
             int buffer_size = 0;
-            check_message(client_get_socket(c), &status, &response_buffer, &buffer_size, MAX_BLOCK_SIZE);
+            check_message(client_get_socket(c), &status, &response_buffer, &buffer_size);
 
             if(status == 0) {
 
@@ -114,7 +134,7 @@ void client_handle(client* c) {
             scanf(" %m[^\n\r]", &msg_buffer);
 
             // Sends the message to the client.
-            send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer), MAX_BLOCK_SIZE);
+            send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer));
             printf("\nMessage sent to server...\n");
 
             // Frees the memory used for the buffer.
@@ -125,10 +145,11 @@ void client_handle(client* c) {
         }
 
         if(strcmp(command_buffer, "/quit") == 0) {
-            break;
+            CLOSE_CLIENT_FLAG = 1;
+            continue;
         }
 
-    } while (strcmp(command_buffer, "/quit") != 0);
+    } while (!CLOSE_CLIENT_FLAG);
 
 }
 

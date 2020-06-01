@@ -4,13 +4,13 @@
 
 # include <string.h>
 
-#include <fcntl.h>
+# include <fcntl.h>
 
 # include <sys/types.h>
 # include <sys/socket.h>
 
 // Sends data to a socket.
-void send_message(int socket, char *send_buffer, int buffer_size, int max_block_size) {
+void send_message(int socket, char *send_buffer, int buffer_size) {
 
     // Breaks the message into blocks of a maximum size.
     int sent = 0;
@@ -19,10 +19,10 @@ void send_message(int socket, char *send_buffer, int buffer_size, int max_block_
 
         // Calculates how much data to send in this block.
         int bytes_to_send;
-        if(buffer_size - sent < max_block_size) {
+        if(buffer_size - sent < MAX_BLOCK_SIZE) {
             bytes_to_send = buffer_size - sent;
         } else {
-            bytes_to_send = max_block_size;
+            bytes_to_send = MAX_BLOCK_SIZE;
         }
 
         // Sends the data.
@@ -32,7 +32,7 @@ void send_message(int socket, char *send_buffer, int buffer_size, int max_block_
 }
 
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, int *status, char **response_buffer, int *buffer_size, int max_block_size) {
+void check_message(int socket, int *status, char **response_buffer, int *buffer_size) {
 
     // Ensures the socket is set to non-blocking.
     int flags = fcntl(socket, F_GETFL);
@@ -40,13 +40,13 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
     fcntl(socket, F_SETFL, flags);
 
     // Receives the message.
-    char *temp_buffer = (char*)malloc(max_block_size * sizeof(char));
+    char temp_buffer[MAX_BLOCK_SIZE];
     int bytes_received = 0;
     while (1)
     {
 
         // Tries receiving data.        
-        int received_now = recv(socket, temp_buffer, max_block_size, 0);
+        int received_now = recv(socket, temp_buffer, MAX_BLOCK_SIZE, 0);
 
         // Handles no data received.
         if(received_now < 1) {
@@ -75,14 +75,11 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
         bytes_received += received_now;
 
         // Checks if the message has been received to it's end.
-        if(received_now < max_block_size || (received_now == max_block_size && temp_buffer[max_block_size - 1] == '\0')) { 
+        if(received_now < MAX_BLOCK_SIZE || (received_now == MAX_BLOCK_SIZE && temp_buffer[MAX_BLOCK_SIZE - 1] == '\0')) { 
             *buffer_size = bytes_received;
             break;
         }
 
     }
-    
-    // Frees the temporary buffer.
-    free(temp_buffer);   
 
 }
