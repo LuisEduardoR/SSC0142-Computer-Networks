@@ -38,6 +38,17 @@ typedef struct CLIENT_CONNECTION
 
 } client_connection;
 
+// Used to pass information about the message that needs to be redirected to the threads.
+typedef struct REDIRECT_MESSAGE
+{
+
+    int attempts;
+    int target_socket;
+    char *message;
+    int message_size;
+
+} redirect_message;
+
 // Struct for the server.
 struct SERVER
 {
@@ -57,6 +68,7 @@ void *handle_connections(void *s);
 void close_server();
 client_connection *server_listen(server *s, int *status);
 void remove_client(client_connection *connection);
+void *send_message_worker(void * redirect);
 // =======================================================================================================================
 
 // Creates a new server with a network socket and binds the socket.
@@ -210,11 +222,35 @@ void *handle_client(void* connect)
                 strcpy(sending_buffer, nickname_buffer);
                 strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
 
+                // Creates an array to store the threads that will be used to send the message to the other clients.
+                pthread_t *worker_threads = (pthread_t*)malloc(sizeof(pthread_t) * (client_connect->server_instance->client_connections_count - 1));
+
                 // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
+                int skipped_sender = 0; // Used to mark if the thread that originally send this message has already being skipped when creating the worker threads.
                 for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
-                    if(client_connect->server_instance->client_connections[i] != client_connect)
-                        send_message(client_connect->server_instance->client_connections[i]->client_socket, sending_buffer, total_send_size);
+
+                    // Redirects the message to all clients, with the exception of the source.
+                    if(client_connect->server_instance->client_connections[i] != client_connect) {
+
+                        // Creates a structure to contain the data necessary for the worker thread.
+                        redirect_message *redirect = (redirect_message*)malloc(sizeof(redirect_message));
+
+                        // Puts the data in the structure.
+                        redirect->attempts = 0;
+                        redirect->target_socket = client_connect->server_instance->client_connections[i]->client_socket;
+                        redirect->message = sending_buffer;
+                        redirect->message_size = total_send_size;
+
+                        // Creates the worker thread.
+                        pthread_create(&(worker_threads[i - skipped_sender]), NULL, send_message_worker, (void*)redirect);
+
+                    } else // Marks that the source client has been skiped (Used to correctly place the worker threads in the array).
+                        skipped_sender = 1;
                 }
+
+                // Waits for the worker threads to finish.
+                for(int i = 0; i < client_connect->server_instance->client_connections_count - 1; i++)
+                    pthread_join(worker_threads[i], NULL);
 
                 // Frees the buffer used for the sent message.
                 free(sending_buffer);
@@ -241,6 +277,17 @@ void *handle_client(void* connect)
 
     // Disconnects the client before exiting this thread.
     remove_client(client_connect); 
+
+}
+
+// Used as a worker thread to redirect messages to all other clients at the same time.
+void *send_message_worker(void * redirect) {
+
+    // Gets the information about the redirected message.
+    redirect_message *redirected_message = (redirect_message*)redirect;
+
+    // Sends the message.
+    send_message(redirected_message->target_socket, redirected_message->message, redirected_message->message_size);
 
 }
 
