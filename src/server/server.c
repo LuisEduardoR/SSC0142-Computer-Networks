@@ -32,7 +32,10 @@ int CLOSE_SERVER_FLAG = 0;
 typedef struct CLIENT_CONNECTION
 {
 
+    int alive;
+
     server *server_instance;
+    
     int client_socket;
     pthread_t thread;
 
@@ -249,14 +252,11 @@ void *handle_client(void* connect)
                 strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
 
                 // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-                int skipped_sender = 0; // Used to mark if the thread that originally send this message has already being skipped when creating the worker threads.
                 for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
 
                     // Redirects the message to all clients, with the exception of the source.
-                    if(client_connect->server_instance->client_connections[i] != client_connect)
-                        create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
-                    else // Marks that the source client has been skiped (Used to correctly place the worker threads in the array).
-                        skipped_sender = 1;
+                    create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
+
                 }
 
             }
@@ -328,6 +328,9 @@ void *send_message_worker(void * redirect) {
     int success = 0;
     while (redirected_message->attempts > 0) {
 
+        if(!redirected_message->target_client->alive) // Checks if the client is still connected.
+            break;
+
         // Sends the message.
         send_message(redirected_message->target_client->client_socket, redirected_message->message, redirected_message->message_size);
 
@@ -357,7 +360,7 @@ void *send_message_worker(void * redirect) {
     }
 
     // If the client could not confirm the message was received, shut it down.
-    if(!success)
+    if(!success && redirected_message->target_client->alive)
         shutdown(redirected_message->target_client->client_socket, 2);
 
     // Frees the struct with the redirection information and the stored message.
@@ -389,6 +392,7 @@ client_connection *server_listen(server *s, int *status) {
 
     // Creates a new connection object and assigns the socket.
     client_connection *new_connection = (client_connection*)malloc(sizeof(client_connection));
+    new_connection->alive = 1;
     new_connection->client_socket = new_client_socket;
     new_connection->server_instance = s;
 
@@ -401,12 +405,16 @@ client_connection *server_listen(server *s, int *status) {
 // Removes a client that has disconnected from the server.
 void remove_client(client_connection *connection) {
 
+
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     sem_wait(&(connection->server_instance->updating_connections));
 
     // ENTER CRITICAL REGION =======================================
 
     fprintf(stderr, "Client with socket %d disconnected!\n", connection->client_socket);
+
+    // Mark that this connection is being removed.
+    connection->alive = 0;
 
     // Finds the connection that 
     int found_connection = 0;
@@ -428,6 +436,12 @@ void remove_client(client_connection *connection) {
 
     // Exits the critical region, and opens the semaphore.
     sem_post(&(connection->server_instance->updating_connections));
+
+    // Ensures that any thread trying to check if a message was succesfully sent has ended.
+    usleep(2 * ACKNOWLEDGE_WAIT_TIME);
+
+    // Destroys the connection semaphore.
+    sem_destroy(&(connection->updating_received_message_status));
 
     // Frees the current connection.
     free(connection);
