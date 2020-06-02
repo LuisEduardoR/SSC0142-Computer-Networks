@@ -6,7 +6,9 @@
 # ifndef SERVER_H
 # define SERVER_H
 
-# define BACKLOG_LEN 8
+# define BACKLOG_LEN 8 // Max connections backlog
+# define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message.
+# define ACKNOWLEDGE_WAIT_TIME 400 // Amount of time the server will wait before an attempt to send a message is failed.
 
 typedef struct SERVER server; 
 

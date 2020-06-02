@@ -141,7 +141,6 @@ void client_handle(client* c) {
             sem_post(&(c->updating_messages));
 
             // --------------------------------------------------------------------------------------------------------------------------------------------------
-            
 
             continue;
         }
@@ -154,9 +153,17 @@ void client_handle(client* c) {
             char *msg_buffer;
             scanf(" %m[^\n\r]", &msg_buffer);
 
-            // Sends the message to the server to be redirected to the other clients.
-            send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer));
-            printf("\nMessage sent to server...\n");
+            // Checks if the message is valid.
+            if(msg_buffer[0] == '/') {
+                printf("\nA message can't start with '/'!\n");
+            } else {
+
+                // Sends the message to the server to be redirected to the other clients.
+                int status;
+                send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer));
+                printf("\nMessage sent to server...\n");
+
+            }
 
             // Frees the memory used for the buffer.
             free(msg_buffer);
@@ -169,6 +176,7 @@ void client_handle(client* c) {
         if(strcmp(command_buffer, "/ping") == 0) {
 
             // Sends the the /ping command to the client, use /new to see if "pong" was received.
+            int status;
             send_message(client_get_socket(c), "/ping", 6);
             printf("\nPing sent to server... Use /new to check for the response!\n");
 
@@ -200,7 +208,7 @@ void *client_check_message(void* current_client) {
         int status = 0;
         char *response_buffer = NULL;
         int buffer_size = 0;
-        check_message(client_get_socket(c), &status, &response_buffer, &buffer_size);
+        check_message(client_get_socket(c), &status, 1, &response_buffer, &buffer_size);
 
         if(status == 0) {
 

@@ -36,6 +36,9 @@ typedef struct CLIENT_CONNECTION
     int client_socket;
     pthread_t thread;
 
+    sem_t updating_received_message_status;
+    int ack_received_message;
+
 } client_connection;
 
 // Used to pass information about the message that needs to be redirected to the threads.
@@ -43,7 +46,7 @@ typedef struct REDIRECT_MESSAGE
 {
 
     int attempts;
-    int target_socket;
+    client_connection *target_client;
     char *message;
     int message_size;
 
@@ -68,6 +71,7 @@ void *handle_connections(void *s);
 void close_server();
 client_connection *server_listen(server *s, int *status);
 void remove_client(client_connection *connection);
+void create_send_message_worker(client_connection *target_socket, char *message, int message_size);
 void *send_message_worker(void * redirect);
 // =======================================================================================================================
 
@@ -182,10 +186,8 @@ void *handle_client(void* connect)
     // Gets a reference to the client handled by this thread.
     client_connection* client_connect = (client_connection*)(connect);
 
-    // Sends a welcome message to the client joining the chat.
-    char welcome_msg_buffer[53];
-    sprintf(welcome_msg_buffer, "server: Welcome %d!", client_connect->client_socket);
-    send_message(client_connect->client_socket, welcome_msg_buffer, strlen(welcome_msg_buffer) + 1);
+    // Initializes the semaphore used for checking if the message was received.
+    sem_init(&(client_connect->updating_received_message_status), 0, 1);
 
     while(!CLOSE_SERVER_FLAG) {
 
@@ -193,10 +195,14 @@ void *handle_client(void* connect)
         int status = 0;
         char *response_buffer = NULL;
         int buffer_size = 0;
-        check_message(client_connect->client_socket, &status, &response_buffer, &buffer_size);
+        check_message(client_connect->client_socket, &status, 0, &response_buffer, &buffer_size);
         
         // Redirects the message to the other clients.
         if(status == 0) { // A message was received and must be redirected.
+
+            // Will be used to store the message that's being sent.
+            int sending_buffer_size = 0;
+            char *sending_buffer = NULL;
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
             sem_wait(&(client_connect->server_instance->updating_connections));
@@ -205,55 +211,53 @@ void *handle_client(void* connect)
 
             if(strcmp(response_buffer, "/ping") == 0) { // Detects the ping command.
 
-                // Sends pong back to the client.
-                send_message(client_connect->client_socket, "server: pong", 13);
+                // Creates the message.
+                sending_buffer = (char*)malloc(sizeof(char) * 64);
+                sprintf(sending_buffer, "server: pong");
+                sending_buffer_size = strlen(sending_buffer) + 1;
 
-            } else { // I fno command is detected, it's a regular message that needs to be sent to others.
+                // Creates the worker thread to send the message.
+                create_send_message_worker(client_connect, sending_buffer, sending_buffer_size);
+
+            } else if(strcmp(response_buffer, ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
+
+                // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+                sem_wait(&(client_connect->updating_received_message_status));
+
+                // ENTER CRITICAL REGION =======================================
+
+                client_connect->ack_received_message--; // Marks that the client has acknowledge a message. 
+
+                // EXIT CRITICAL REGION ========================================
+
+                // Exits the critical region, and opens the semaphore.
+                sem_post(&(client_connect->updating_received_message_status));
+
+
+            } else { // If no command is detected, it's a regular message that needs to be sent to others.
 
                 // Adds the socket from the client who sent the message to it's start.
-                char nickname_buffer[53];
+                char nickname_buffer[64];
                 sprintf(nickname_buffer, "%d: ", client_connect->client_socket);
 
                 // Creates a new buffer to store the nickname and the message.
-                int total_send_size = strlen(nickname_buffer) + strlen(response_buffer) + 1;
-                char *sending_buffer = malloc(sizeof(char) * total_send_size);
+                sending_buffer_size = strlen(nickname_buffer) + strlen(response_buffer) + 1;
+                sending_buffer = malloc(sizeof(char) * sending_buffer_size);
 
                 // Constructs the message to be sent.
                 strcpy(sending_buffer, nickname_buffer);
                 strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
-
-                // Creates an array to store the threads that will be used to send the message to the other clients.
-                pthread_t *worker_threads = (pthread_t*)malloc(sizeof(pthread_t) * (client_connect->server_instance->client_connections_count - 1));
 
                 // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
                 int skipped_sender = 0; // Used to mark if the thread that originally send this message has already being skipped when creating the worker threads.
                 for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
 
                     // Redirects the message to all clients, with the exception of the source.
-                    if(client_connect->server_instance->client_connections[i] != client_connect) {
-
-                        // Creates a structure to contain the data necessary for the worker thread.
-                        redirect_message *redirect = (redirect_message*)malloc(sizeof(redirect_message));
-
-                        // Puts the data in the structure.
-                        redirect->attempts = 0;
-                        redirect->target_socket = client_connect->server_instance->client_connections[i]->client_socket;
-                        redirect->message = sending_buffer;
-                        redirect->message_size = total_send_size;
-
-                        // Creates the worker thread.
-                        pthread_create(&(worker_threads[i - skipped_sender]), NULL, send_message_worker, (void*)redirect);
-
-                    } else // Marks that the source client has been skiped (Used to correctly place the worker threads in the array).
+                    if(client_connect->server_instance->client_connections[i] != client_connect)
+                        create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
+                    else // Marks that the source client has been skiped (Used to correctly place the worker threads in the array).
                         skipped_sender = 1;
                 }
-
-                // Waits for the worker threads to finish.
-                for(int i = 0; i < client_connect->server_instance->client_connections_count - 1; i++)
-                    pthread_join(worker_threads[i], NULL);
-
-                // Frees the buffer used for the sent message.
-                free(sending_buffer);
 
             }
 
@@ -261,6 +265,9 @@ void *handle_client(void* connect)
 
             // Exits the critical region, and opens the semaphore.
             sem_post(&(client_connect->server_instance->updating_connections));
+
+            // Frees the buffer used for the sent message.
+            free(sending_buffer);
 
         } else if(status == 1) { // No new messages from this client.
             // If there are no messages nothing is done.
@@ -280,15 +287,83 @@ void *handle_client(void* connect)
 
 }
 
+// Creates a worker thread to send a message.
+void create_send_message_worker(client_connection *target_client, char *message, int message_size) {
+
+    // Creates a structure to contain the data necessary for the worker thread.
+    redirect_message *redirect = (redirect_message*)malloc(sizeof(redirect_message));
+
+    // Puts the data in the structure.
+    redirect->attempts = MAX_RESENDING_ATTEMPS;
+    redirect->target_client = target_client;
+    redirect->message = (char*)malloc(sizeof(char) * message_size); // Allocates space for the message.
+    memcpy(redirect->message, message, message_size); // COpies the message.
+    redirect->message_size = message_size;
+
+    // Creates the worker thread.
+    pthread_t worker;
+    pthread_create(&worker, NULL, send_message_worker, (void*)redirect);
+
+}
+
 // Used as a worker thread to redirect messages to all other clients at the same time.
 void *send_message_worker(void * redirect) {
 
     // Gets the information about the redirected message.
     redirect_message *redirected_message = (redirect_message*)redirect;
 
-    // Sends the message.
-    send_message(redirected_message->target_socket, redirected_message->message, redirected_message->message_size);
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    sem_wait(&(redirected_message->target_client->updating_received_message_status));
 
+    // ENTER CRITICAL REGION =======================================
+
+    redirected_message->target_client->ack_received_message++; // Marks that this clients needs to acknwoledge that a message has being received.
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    sem_post(&(redirected_message->target_client->updating_received_message_status));
+
+    // Attempt sending the message.
+    int success = 0;
+    while (redirected_message->attempts > 0) {
+
+        // Sends the message.
+        send_message(redirected_message->target_client->client_socket, redirected_message->message, redirected_message->message_size);
+
+        // Sleeps the thread for the desired time to wait for a response.
+        usleep(ACKNOWLEDGE_WAIT_TIME);
+
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        sem_wait(&(redirected_message->target_client->updating_received_message_status));
+
+        // ENTER CRITICAL REGION =======================================
+
+        if(redirected_message->target_client->ack_received_message < 1) // Marks that all messages were successfully sent.
+            success = 1;
+
+        // EXIT CRITICAL REGION ========================================
+
+        // Exits the critical region, and opens the semaphore.
+        sem_post(&(redirected_message->target_client->updating_received_message_status));
+
+        // Breaks when the message was successfully sent.
+        if(success)
+            break;
+
+        // If the message failed to be sent, decreases the number of attemps remaining.
+        redirected_message->attempts--;
+
+    }
+
+    // If the client could not confirm the message was received, shut it down.
+    if(!success)
+        shutdown(redirected_message->target_client->client_socket, 2);
+
+    // Frees the struct with the redirection information and the stored message.
+    free(redirected_message->message);
+    free(redirected_message);
+    
 }
 
 // Listen and accept incoming connections, return the socket from the incoming client.

@@ -29,12 +29,13 @@ void send_message(int socket, char *send_buffer, int buffer_size) {
 
         // Sends the data.
         sent += send(socket, send_buffer + sent, bytes_to_send, 0);
-    }    
+
+    }
 
 }
 
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, int *status, char **response_buffer, int *buffer_size) {
+void check_message(int socket, int *status, int need_to_acknowledge, char **response_buffer, int *buffer_size) {
 
     // Ensures the socket is set to non-blocking.
     int flags = fcntl(socket, F_GETFL);
@@ -56,7 +57,7 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
                 *status = -1;
                 *response_buffer = NULL;
                 *buffer_size = 0;
-                break;
+                return;
 
         } else if (received_now < 0) {
 
@@ -66,7 +67,7 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
                     *status = 1;
                     *response_buffer = NULL;
                     *buffer_size = 0;
-                    break;
+                    return;
                 } else { // Continues waiting for the message.
                     continue;   
                 }
@@ -76,7 +77,7 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
                 *status = -1;
                 *response_buffer = NULL;
                 *buffer_size = 0;
-                break;
+                return;
             }
             
         }
@@ -94,6 +95,17 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
             *buffer_size = bytes_received;
             break;
         }
+
+    }
+
+    // Sends an acknoledgement that the message has being received if necessary.
+    if(need_to_acknowledge) {
+
+        // The acknowledge message.
+        char ack[] = ACKNOWLEDGE_MESSAGE;
+
+        // Sends the ack
+        send_message(socket, ack, strlen(ack) + 1);
 
     }
 

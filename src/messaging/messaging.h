@@ -8,10 +8,12 @@
 
 // The maximum number of bytes that can be sent or received at once.
 # define MAX_BLOCK_SIZE 4096
+// The message used to acknowledge data was received.
+# define ACKNOWLEDGE_MESSAGE "/ack"
 
 // Sends data to a socket.
 void send_message(int socket, char *send_buffer, int buffer_size);
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, int* status, char **receive_buffer, int *buffer_size);
+void check_message(int socket, int *status, int need_to_acknowledge, char **receive_buffer, int *buffer_size);
 
 # endif
