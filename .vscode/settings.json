@@ -47,6 +47,13 @@
         "streambuf": "cpp",
         "typeinfo": "cpp",
         "csignal": "cpp",
-        "cstring": "cpp"
+        "cstring": "cpp",
+        "chrono": "cpp",
+        "ctime": "cpp",
+        "ratio": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "mutex": "cpp",
+        "condition_variable": "cpp"
     }
 }

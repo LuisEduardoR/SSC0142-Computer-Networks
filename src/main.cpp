@@ -27,14 +27,14 @@ enum TYPE { CLIENT, SERVER };
 int main(int argc, char* argv[])
 {
 
-    // Gets the argument with index 1.
-    std::string argv_1(argv[1]);
-
     // Displays help text, if wrong number of parameters was passed.
     if(argc < 2) {
         std::cout << HELP_NO_PARAMETERS << std::endl;
         return 0;
     }
+
+    // Gets the argument with index 1.
+    std::string argv_1(argv[1]);
 
     // Displays help text, if asked to.
     if(argv_1.compare("--help") == 0) {
@@ -106,9 +106,9 @@ int main(int argc, char* argv[])
 
                 // Creates the client.
                 std::cout << std::endl << "Creating new client..." << std::endl;
-                client *c = client_create();
+                client *c = new client();
                 // Checks for errors creating the client.
-                if(c == NULL) {
+                if(c == nullptr) {
                     std::cerr << "Error creating new client! (-1)" << std::endl << std::endl;
                     return -1;
                 }
@@ -116,21 +116,21 @@ int main(int argc, char* argv[])
 
                 // Connects to the server.
                 std::cout << std::endl << "Attempting connection to server (" << server_addr << ":" << server_port << ")..." << std::endl;
-                int cnct_status = client_connect(c, server_addr.c_str(), server_port);
+                int cnct_status = c->connect_to_server(server_addr.c_str(), server_port);
                 // Checks for errors.
                 if(cnct_status < 0) {
                     std::cerr << "Error connecting to remote socket! (" << cnct_status << ")" << std::endl << std::endl;
-                    client_delete(&c);
+                    delete c;
                     return cnct_status;
                 }
                 std::cout << "Connected to the server successfully!" << std::endl;
 
                 // Handles the client execution until it's disconnected.
-                client_handle(c);
+                c->handle();
 
                 // Deletes the client.
                 std::cout << std::endl << "Disconnected!" << std::endl << std::endl;
-                client_delete(&c);
+                delete c;
 
                 // Exits the program.
                 return 0;
@@ -158,29 +158,29 @@ int main(int argc, char* argv[])
 
         // Creates the server.
         std::cout << std::endl << "Creating server at port " << server_port << "..." << std::endl;
-        server *s = server_create(server_port);
+        server *s = new server(server_port);
         // Checks for errors creating the server.
-        if(s == NULL) {
+        if(s == nullptr) {
             std::cerr << "Error creating server! (-1)" << std::endl << std::endl;
             return -1;
         }
         
         // Checks for errors.
-        int svr_status = server_status(s);
+        int svr_status = s->server_status;
         if(svr_status < 0) {
             std::cerr << "Error connecting to socket! (" << svr_status << ")" << std::endl << std::endl;
-            server_delete(&s);
+            delete s;
             return svr_status;
         }
         std::cout << "Server created successfully!" << std::endl << std::endl;
 
         // Handles the server execution.
         std::cout << "Running... (Press CTRL+C to stop)" << std::endl << std::endl;
-        server_handle(s);
+        s->handle();
 
         // Deletes the server after it's done.
         std::cout << std::endl << "Disconnected!" << std::endl << std::endl;;
-        server_delete(&s);
+        delete s;
 
     } else // Don't do anything for other parameters.
         std::cout << std::endl << "Invalid parameter!" << std::endl << std::endl;

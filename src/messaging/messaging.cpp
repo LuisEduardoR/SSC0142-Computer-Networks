@@ -1,6 +1,6 @@
 # include "messaging.hpp"
 
-# include <stdio.h>
+# include <iostream>
 # include <stdlib.h>
 # include <string.h>
 
@@ -12,30 +12,41 @@
 # include <sys/socket.h>
 
 // Sends data to a socket.
-void send_message(int socket, const char *send_buffer, int buffer_size) {
+void send_message(int socket, std::string &message){
+
+    // Gets the message in the format of an array.
+    const char * c_str = message.c_str();
+    char *message_data = new char[message.size() + 1];
+    for(int i = 0; i < message.size() + 1; i++)
+        message_data[i] = c_str[i];
 
     // Breaks the message into blocks of a maximum size.
     int sent = 0;
-    while (sent < buffer_size)
+    while (sent < (message.length() + 1))
     {
 
         // Calculates how much data to send in this block.
         int bytes_to_send;
-        if(buffer_size - sent < MAX_BLOCK_SIZE) {
-            bytes_to_send = buffer_size - sent;
+        if(message.length() + 1 - sent < MAX_BLOCK_SIZE) {
+            bytes_to_send = message.length() + 1 - sent;
         } else {
             bytes_to_send = MAX_BLOCK_SIZE;
         }
 
         // Sends the data.
-        sent += send(socket, send_buffer + sent, bytes_to_send, 0);
+        sent += send(socket, message_data + sent, bytes_to_send, 0);
 
     }
+
+    delete[] message_data;
 
 }
 
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, int *status, int need_to_acknowledge, char **response_buffer, int *buffer_size) {
+std::string check_message(int socket, int *status, int need_to_acknowledge) {
+
+    // Stores the received message.
+    std::string response_message;
 
     // Ensures the socket is set to non-blocking.
     int flags = fcntl(socket, F_GETFL);
@@ -45,68 +56,50 @@ void check_message(int socket, int *status, int need_to_acknowledge, char **resp
     // Receives the message.
     char temp_buffer[MAX_BLOCK_SIZE];
     int bytes_received = 0;
-    while (1)
-    {
+    int received_now = 0;
+    do {
 
         // Tries receiving data.        
-        int received_now = recv(socket, temp_buffer, MAX_BLOCK_SIZE, 0);
+        received_now = recv(socket, temp_buffer, MAX_BLOCK_SIZE, 0);
 
         // Handles no data received.
         if(received_now == 0) { // The server or client has disconnected in a ordenerly way.
-
                 *status = -1;
-                *response_buffer = NULL;
-                *buffer_size = 0;
-                return;
-
+                return std::string("\0"); // Returns empty string.
         } else if (received_now < 0) {
 
             if(errno == EAGAIN || errno == EWOULDBLOCK) { 
             
                 if(bytes_received == 0) { // No new message.
                     *status = 1;
-                    *response_buffer = NULL;
-                    *buffer_size = 0;
-                    return;
+                    return std::string("\0"); // Returns empty string.
                 } else { // Continues waiting for the message.
                     continue;   
-                }
-                
+                }    
                 
             } else { // Error.
                 *status = -1;
-                *response_buffer = NULL;
-                *buffer_size = 0;
-                return;
+                return std::string("\0"); // Returns empty string.
             }
             
         }
 
-        // Realocates the final buffer.
-        *response_buffer = (char*)realloc(*response_buffer, (bytes_received + received_now) * sizeof(char));
-
-        // Copies the data to the permanent buffer.
-        memcpy((*response_buffer) + bytes_received, temp_buffer, received_now);
-        // Adds the new bytes to the buffer size.
+        // Adds the received data to the response string and counts the amout of data received.
+        response_message += std::string(temp_buffer);
         bytes_received += received_now;
 
-        // Checks if the message has been received to it's end.
-        if(received_now < MAX_BLOCK_SIZE || (received_now == MAX_BLOCK_SIZE && temp_buffer[MAX_BLOCK_SIZE - 1] == '\0')) { 
-            *buffer_size = bytes_received;
-            break;
-        }
-
-    }
+    } while (received_now < 0 || (received_now == MAX_BLOCK_SIZE && temp_buffer[MAX_BLOCK_SIZE - 1] == '\0'));
+    
 
     // Sends an acknoledgement that the message has being received if necessary.
     if(need_to_acknowledge) {
-
         // The acknowledge message.
-        char ack[] = ACKNOWLEDGE_MESSAGE;
+        std::string ack(ACKNOWLEDGE_MESSAGE);
 
         // Sends the ack
-        send_message(socket, ack, strlen(ack) + 1);
-
+        send_message(socket, ack);
     }
+
+    return response_message;
 
 }

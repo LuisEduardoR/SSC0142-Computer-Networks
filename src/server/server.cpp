@@ -6,16 +6,16 @@
 # include "server.hpp"
 # include "../messaging/messaging.hpp"
 
-# include <stdio.h>
-# include <stdlib.h>
-# include <string.h>
+# include <iostream>
+# include <string>
 
 # include <errno.h>
 
 # include <fcntl.h>
 # include <csignal>
-# include <semaphore.h>
-# include <pthread.h>
+
+# include <mutex>
+# include <thread>
 
 # include <sys/types.h>
 # include <sys/socket.h>
@@ -26,208 +26,171 @@
 #include <unistd.h>
 
 // Used to indicate when the server should be closed.
-int CLOSE_SERVER_FLAG = 0;
+bool CLOSE_SERVER_FLAG = false;
 
-// Struct for the connection, so that we can pass it as an argument to the handle_client threads
-typedef struct CLIENT_CONNECTION
-{
+// Creates a new server with a network socket and binds the socket.
+server::server(int port_number) { 
 
-    int alive;
+    // Creates a TCP socket.
+    this->server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
-    server *server_instance;
-    
-    int client_socket;
-    pthread_t thread;
+    // Sets the socket to be non-blocking.
+    int flags = fcntl(this->server_socket, F_GETFL);
+    flags |= O_NONBLOCK;
+    fcntl(this->server_socket, F_SETFL, flags);
 
-    sem_t updating_received_message_status;
-    int ack_received_message;
+    // Gets an adress for the socket.
+    this->server_adress.sin_family = AF_INET;
+    this->server_adress.sin_port = htons(port_number);
+    this->server_adress.sin_addr.s_addr = INADDR_ANY;
 
-} client_connection;
+    // Binds the server to the socket.
+    this->server_status = bind(this->server_socket, (struct sockaddr *) &(this->server_adress), sizeof(this->server_adress));
+
+    // Inializes the client connections list.
+    client_connections.clear();
+
+}
+
+// DESTRUCTOR
+server::~server() { 
+
+    // Closes the socket.
+    close(this->server_socket);
+
+    // Joins the threads before exiting.
+    for(auto it = this->connection_threads.begin(); it != this->connection_threads.end(); it++)
+        (*it).join();
+
+}
+
+// CONSTRUCTOR
+client_connection::client_connection(int socket, server *server_instance) {
+
+    this->alive = 1;
+    this->client_socket = socket;
+    this->server_instance = server_instance;
+
+}
 
 // Used to pass information about the message that needs to be redirected to the threads.
-typedef struct REDIRECT_MESSAGE
+class redirect_message
 {
 
-    int attempts;
-    client_connection *target_client;
-    char *message;
-    int message_size;
+    public:
 
-} redirect_message;
+        redirect_message(int max_resending_attempts, client_connection *target_client, std::string message);
 
-// Struct for the server.
-struct SERVER
-{
-    int server_socket;
-    struct sockaddr_in server_adress;
-    int server_status;
+        int attempts;
+        client_connection *target_client;
+        std::string message;
 
-    sem_t updating_connections;
-    client_connection **client_connections;
-    int client_connections_count;
+    private:
 
 };
 
+// CONSTRUCTOR
+redirect_message::redirect_message(int max_resending_attempts, client_connection *target_client, std::string message) {
+
+    this->attempts = max_resending_attempts;
+    this->target_client = target_client;
+    this->message = message;
+
+}
 // Private function headers, will be declared bellow. ====================================================================
-void *handle_client(void* client);
-void *handle_connections(void *s);
+void handle_client(client_connection *client_connect);
+void handle_connections(server *serv);
 void close_server(int signal_num);
-client_connection *server_listen(server *s, int *status);
 void remove_client(client_connection *connection);
-void create_send_message_worker(client_connection *target_socket, char *message, int message_size);
-void *send_message_worker(void * redirect);
+void create_send_message_worker(client_connection *target_socket, std::string message);
+void send_message_worker(redirect_message *redirect);
 // =======================================================================================================================
 
-// Creates a new server with a network socket and binds the socket.
-server *server_create(int port_number) { 
-
-    // Allocates memory for the new server.
-    server *s = (server*)malloc(sizeof(server));
-    if(s == NULL) // Verifies memory allocation error.
-        return NULL;
-
-    // Creates a TCP socket.
-    s->server_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-    // Sets the socket to be non-blocking.
-    int flags = fcntl(s->server_socket, F_GETFL);
-    flags |= O_NONBLOCK;
-    fcntl(s->server_socket, F_SETFL, flags);
-
-    // Gets an adress for the socket.
-    s->server_adress.sin_family = AF_INET;
-    s->server_adress.sin_port = htons(port_number);
-    s->server_adress.sin_addr.s_addr = INADDR_ANY;
-
-    // Binds the server to the socket.
-    s->server_status = bind(s->server_socket, (struct sockaddr *) &(s->server_adress), sizeof(s->server_adress));
-
-    // Initializes the semaphore used to protect the connections array.
-    sem_init(&(s->updating_connections), 0, 1);
-
-    // Initializes the client connections as empty.
-    s->client_connections = NULL;
-    s->client_connections_count = 0;
-
-    return s; 
-
-}
-
-// Returns the server status, the server status is stored as the return of the bind function during server_create.
-int server_status(server *s) {
-
-    return s->server_status;
-
-}
-
 // Handles the server instance (control of the program is given to the server until it finishes).
-void server_handle(server* s) {
+void server::handle() {
 
     // Sets the server to be closed when CTRL+C is pressed.
     std::signal(SIGINT, close_server);
 
     // Creates a thread to handle new connections.
-    pthread_t connection_thread;
-    pthread_create(&connection_thread, NULL, handle_connections, (void*)s);
+    std::thread connection_thread(handle_connections, this);
 
-    pthread_join(connection_thread, NULL);
+    // Waits for the connection thread to finish.
+    connection_thread.join();
 
 }
 
-void *handle_connections(void *s) {
-
-    // Stores the server pointer.
-    server *serv = (server*)s;
+void handle_connections(server *serv) {
 
     while(!CLOSE_SERVER_FLAG)
     {
 
         // Listens for new connection.
         int status = 0;
-        client_connection *new_connection = server_listen(serv, &status);
+        client_connection *new_connection = serv->listen_for_connections(&status);
 
-        if(new_connection == NULL) {
+        if(new_connection == nullptr) {
 
             if(status != 1) // If status is 1, no new connection is currently avaliable, otherwise an error ocurred.
-                fprintf(stderr, "Unidentified connection error!\n");
+                std::cerr << "Unidentified connection error!" << std::endl;
 
         } else { // Initializes the new connection.
 
             // Handles creating the new connection and adding it to the array in a thread safe way. ----------------------------------------------------------V
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            sem_wait(&(serv->updating_connections));
+            while(!serv->updating_connections.try_lock());
 
             // ENTER CRITICAL REGION =======================================
 
-            fprintf(stderr, "Client just connected with socket %d!\n", new_connection->client_socket);
+            std::cerr << "Client just connected with socket " << new_connection->client_socket << "!" << std::endl;
+
+            // Creates a new thread to handle the connection.
+            serv->connection_threads.push_back(std::thread(handle_client, new_connection));
 
             // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
-            serv->client_connections = (client_connection**)realloc(serv->client_connections, sizeof(client_connection*) * (serv->client_connections_count + 1));
-            serv->client_connections[serv->client_connections_count] = new_connection;
-            serv->client_connections_count++;
+            serv->client_connections.push_back(new_connection);
 
             // EXIT CRITICAL REGION ========================================
 
             // Exits the critical region, and opens the semaphore.
-            sem_post(&(serv->updating_connections));
+            serv->updating_connections.unlock();
 
             // --------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Creates a new thread to handle the connection.
-            pthread_create(&(new_connection->thread), NULL, handle_client, (void*)new_connection);
-
         }
-
     }
-
-    return NULL;
 
 }
 
-void *handle_client(void* connect)
-{
-
-    // Gets a reference to the client handled by this thread.
-    client_connection* client_connect = (client_connection*)(connect);
-
-    // Initializes the semaphore used for checking if the message was received.
-    sem_init(&(client_connect->updating_received_message_status), 0, 1);
+void handle_client(client_connection *client_connect) {
 
     while(!CLOSE_SERVER_FLAG) {
 
         // Checks for data from the client. A buffer with appropriate size is allocated and must be freed later!
         int status = 0;
-        char *response_buffer = NULL;
-        int buffer_size = 0;
-        check_message(client_connect->client_socket, &status, 0, &response_buffer, &buffer_size);
+        std::string received_message = check_message(client_connect->client_socket, &status, 0);
         
         // Redirects the message to the other clients.
         if(status == 0) { // A message was received and must be redirected.
 
-            // Will be used to store the message that's being sent.
-            int sending_buffer_size = 0;
-            char *sending_buffer = NULL;
-
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            sem_wait(&(client_connect->server_instance->updating_connections));
+            while(!client_connect->server_instance->updating_connections.try_lock());
 
             // ENTER CRITICAL REGION =======================================
 
-            if(strcmp(response_buffer, "/ping") == 0) { // Detects the ping command.
+            if(received_message.compare("/ping") == 0) { // Detects the ping command.
 
-                // Creates the message.
-                sending_buffer = (char*)malloc(sizeof(char) * 64);
-                sprintf(sending_buffer, "server: pong");
-                sending_buffer_size = strlen(sending_buffer) + 1;
+                // Creates the string to be sent.
+                std::string sending_string = std::string("server: pong");
 
                 // Creates the worker thread to send the message.
-                create_send_message_worker(client_connect, sending_buffer, sending_buffer_size);
+                create_send_message_worker(client_connect, sending_string);
 
-            } else if(strcmp(response_buffer, ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
+            } else if(received_message.compare(ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
 
                 // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-                sem_wait(&(client_connect->updating_received_message_status));
+                while(!client_connect->updating_received_message_status.try_lock());
 
                 // ENTER CRITICAL REGION =======================================
 
@@ -236,29 +199,18 @@ void *handle_client(void* connect)
                 // EXIT CRITICAL REGION ========================================
 
                 // Exits the critical region, and opens the semaphore.
-                sem_post(&(client_connect->updating_received_message_status));
+                client_connect->updating_received_message_status.unlock();
 
 
             } else { // If no command is detected, it's a regular message that needs to be sent to others.
 
-                // Adds the socket from the client who sent the message to it's start.
-                char nickname_buffer[64];
-                sprintf(nickname_buffer, "%d: ", client_connect->client_socket);
-
-                // Creates a new buffer to store the nickname and the message.
-                sending_buffer_size = strlen(nickname_buffer) + strlen(response_buffer) + 1;
-                sending_buffer = (char*)malloc(sizeof(char) * sending_buffer_size);
-
-                // Constructs the message to be sent.
-                strcpy(sending_buffer, nickname_buffer);
-                strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
+                // Creates a string to be sent, in the format NICKNAME:MESSAGE.
+                std::string sending_string =  std::to_string(client_connect->client_socket) + ": " + received_message;
 
                 // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-                for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
-
+                for(int i = 0; i < client_connect->server_instance->client_connections.size(); i++) {
                     // Redirects the message to all clients, with the exception of the source.
-                    create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
-
+                    create_send_message_worker(client_connect->server_instance->client_connections[i], sending_string);
                 }
 
             }
@@ -266,58 +218,43 @@ void *handle_client(void* connect)
             // EXIT CRITICAL REGION ========================================
 
             // Exits the critical region, and opens the semaphore.
-            sem_post(&(client_connect->server_instance->updating_connections));
-
-            // Frees the buffer used for the sent message.
-            free(sending_buffer);
+            client_connect->server_instance->updating_connections.unlock();
 
         } else if(status == 1) { // No new messages from this client.
             // If there are no messages nothing is done.
         } else if(status == -1) { // The client has disconnected.
             break; // Exits the thread.
         } else { // An error has happened.
-            fprintf(stderr, "ERROR %d!\n", status);
-        }   
-
-        // Frees the memory used by the buffers.
-        free(response_buffer);
+            std::cerr << "ERROR " << status << "!" << std::endl;
+        }
         
     }
 
     // Disconnects the client before exiting this thread.
     remove_client(client_connect);
 
-    return NULL;
-
 }
 
 // Creates a worker thread to send a message.
-void create_send_message_worker(client_connection *target_client, char *message, int message_size) {
+void create_send_message_worker(client_connection *target_client, std::string message) {
 
     // Creates a structure to contain the data necessary for the worker thread.
-    redirect_message *redirect = (redirect_message*)malloc(sizeof(redirect_message));
-
-    // Puts the data in the structure.
-    redirect->attempts = MAX_RESENDING_ATTEMPS;
-    redirect->target_client = target_client;
-    redirect->message = (char*)malloc(sizeof(char) * message_size); // Allocates space for the message.
-    memcpy(redirect->message, message, message_size); // COpies the message.
-    redirect->message_size = message_size;
+    redirect_message *redirect = new redirect_message(MAX_RESENDING_ATTEMPS, target_client, message);
 
     // Creates the worker thread.
-    pthread_t worker;
-    pthread_create(&worker, NULL, send_message_worker, (void*)redirect);
+    std::thread worker(send_message_worker, redirect);
+    worker.detach();
 
 }
 
 // Used as a worker thread to redirect messages to all other clients at the same time.
-void *send_message_worker(void * redirect) {
+void send_message_worker(redirect_message *redirect) {
 
     // Gets the information about the redirected message.
     redirect_message *redirected_message = (redirect_message*)redirect;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    sem_wait(&(redirected_message->target_client->updating_received_message_status));
+    while(!redirected_message->target_client->updating_received_message_status.try_lock());
 
     // ENTER CRITICAL REGION =======================================
 
@@ -326,7 +263,7 @@ void *send_message_worker(void * redirect) {
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    sem_post(&(redirected_message->target_client->updating_received_message_status));
+    redirected_message->target_client->updating_received_message_status.unlock();
 
     // Attempt sending the message.
     int success = 0;
@@ -336,13 +273,14 @@ void *send_message_worker(void * redirect) {
             break;
 
         // Sends the message.
-        send_message(redirected_message->target_client->client_socket, redirected_message->message, redirected_message->message_size);
+        std::string message = std::string(redirected_message->message);
+        send_message(redirected_message->target_client->client_socket, message);
 
         // Sleeps the thread for the desired time to wait for a response.
         usleep(ACKNOWLEDGE_WAIT_TIME);
 
         // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        sem_wait(&(redirected_message->target_client->updating_received_message_status));
+        while(!redirected_message->target_client->updating_received_message_status.try_lock());
 
         // ENTER CRITICAL REGION =======================================
 
@@ -352,7 +290,7 @@ void *send_message_worker(void * redirect) {
         // EXIT CRITICAL REGION ========================================
 
         // Exits the critical region, and opens the semaphore.
-        sem_post(&(redirected_message->target_client->updating_received_message_status));
+        redirected_message->target_client->updating_received_message_status.unlock();
 
         // Breaks when the message was successfully sent.
         if(success)
@@ -367,22 +305,19 @@ void *send_message_worker(void * redirect) {
     if(!success && redirected_message->target_client->alive)
         shutdown(redirected_message->target_client->client_socket, 2);
 
-    // Frees the struct with the redirection information and the stored message.
-    free(redirected_message->message);
-    free(redirected_message);
-
-    return NULL;
+    // Deletes the struct with the redirection information and the stored message.
+    delete redirected_message;
     
 }
 
-// Listen and accept incoming connections, return the socket from the incoming client.
-client_connection *server_listen(server *s, int *status) {
+// Listen and accept incoming connections, return the incoming client's connection.
+client_connection *server::listen_for_connections(int *status) {
 
     // Listens to the socket.
-    listen(s->server_socket, BACKLOG_LEN);
+    listen(this->server_socket, BACKLOG_LEN);
 
     // Accepts the connection and returns the client socket.
-    int new_client_socket = accept(s->server_socket, NULL, NULL);
+    int new_client_socket = accept(this->server_socket, nullptr, nullptr);
 
     // If no connection happened, checks why.
     if(new_client_socket == -1) {
@@ -397,10 +332,7 @@ client_connection *server_listen(server *s, int *status) {
     }
 
     // Creates a new connection object and assigns the socket.
-    client_connection *new_connection = (client_connection*)malloc(sizeof(client_connection));
-    new_connection->alive = 1;
-    new_connection->client_socket = new_client_socket;
-    new_connection->server_instance = s;
+    client_connection *new_connection = new client_connection(new_client_socket, this);
 
     // Marks that there has been a new connection.
     *status = 0;
@@ -413,65 +345,38 @@ void remove_client(client_connection *connection) {
 
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    sem_wait(&(connection->server_instance->updating_connections));
+    while(!connection->server_instance->updating_connections.try_lock());
 
     // ENTER CRITICAL REGION =======================================
 
-    fprintf(stderr, "Client with socket %d disconnected!\n", connection->client_socket);
+    std::cerr << "Client with socket " << connection->client_socket << " disconnected!" << std::endl;
 
     // Mark that this connection is being removed.
     connection->alive = 0;
 
-    // Finds the connection that 
+    // Finds the connection that is being removed on the list.
     int found_connection = 0;
-    for(int i = 0; i < connection->server_instance->client_connections_count; i++) {
+    for(int i = 0; i < connection->server_instance->client_connections.size(); i++)
+        if(connection->server_instance->client_connections[i] == connection)
+            found_connection = i;
 
-        if(found_connection) { // If the connection was found removes it,, and shifts the pointers after it.
-            connection->server_instance->client_connections[i-1] = connection->server_instance->client_connections[i];
-        } else if(connection->server_instance->client_connections[i] == connection) {
-            found_connection = 1;
-        }
-
-    }
-
-    // Re-sizes the connection list.
-    connection->server_instance->client_connections_count--;
-    connection->server_instance->client_connections = (client_connection**)realloc(connection->server_instance->client_connections, sizeof(client_connection*) * (connection->server_instance->client_connections_count));
+    // Gets an iterator to the connection that needs to be removed and erases it.
+    std::vector<client_connection*>::iterator iter = connection->server_instance->client_connections.begin() + found_connection;
+    connection->server_instance->client_connections.erase(iter, iter);
 
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    sem_post(&(connection->server_instance->updating_connections));
+    connection->server_instance->updating_connections.unlock();
 
     // Ensures that any thread trying to check if a message was succesfully sent has ended.
     usleep(2 * ACKNOWLEDGE_WAIT_TIME);
+    
 
-    // Destroys the connection semaphore.
-    sem_destroy(&(connection->updating_received_message_status));
-
-    // Frees the current connection.
-    free(connection);
+    // Deletes the current connection.
+    delete connection;
 
 }
 
 // Sets the flag to indicate the server should be closed.
-void close_server(int signal_num) { CLOSE_SERVER_FLAG = 1; }
-
-// Deletes the server, closing the socket and freeing memory.
-void server_delete(server **s) { 
-
-    // Closes the socket.
-    close((*s)->server_socket);
-
-    // Free memory used to store server connections.
-    for(int i = 0; i < (*s)->client_connections_count; i++)
-        free((*s)->client_connections[i]);
-    free((*s)->client_connections);
-
-    // Destroys the semaphores after threy are not needed anymore.
-    sem_destroy(&((*s)->updating_connections));
-
-    free(*s); // Frees the struct.
-    *s = NULL; // Sets the variable to NULL.
-
-}
+void close_server(int signal_num) { CLOSE_SERVER_FLAG = true; }

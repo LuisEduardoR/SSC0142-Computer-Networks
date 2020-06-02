@@ -6,14 +6,16 @@
 # ifndef MESSAGING_H
 # define MESSAGING_H
 
+# include <string>
+
 // The maximum number of bytes that can be sent or received at once.
 # define MAX_BLOCK_SIZE 4096
 // The message used to acknowledge data was received.
 # define ACKNOWLEDGE_MESSAGE "/ack"
 
 // Sends data to a socket.
-void send_message(int socket, const char *send_buffer, int buffer_size);
+void send_message(int socket, std::string &message);
 // Tries receiving data from a socket and storing it on a buffer.
-void check_message(int socket, int *status, int need_to_acknowledge, char **receive_buffer, int *buffer_size);
+std::string check_message(int socket, int *status, int need_to_acknowledge);
 
 # endif
