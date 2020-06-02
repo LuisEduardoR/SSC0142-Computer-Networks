@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
         printf("Server created successfully!\n\n");
 
         // Handles the server execution.
-        printf("Running...\n\n");
+        printf("Running... (Press CTRL+C to stop)\n\n");
         server_handle(s);
 
         // Deletes the server afte it's done.

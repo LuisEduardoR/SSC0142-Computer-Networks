@@ -51,12 +51,13 @@ struct SERVER
 
 };
 
-// Private function headers, will be declared bellow.
+// Private function headers, will be declared bellow. ====================================================================
 void *handle_client(void* client);
 void *handle_connections(void *s);
 void close_server();
 client_connection *server_listen(server *s, int *status);
 void remove_client(client_connection *connection);
+// =======================================================================================================================
 
 // Creates a new server with a network socket and binds the socket.
 server *server_create(int port_number) { 
@@ -81,6 +82,9 @@ server *server_create(int port_number) {
 
     // Binds the server to the socket.
     s->server_status = bind(s->server_socket, (struct sockaddr *) &(s->server_adress), sizeof(s->server_adress));
+
+    // Initializes the semaphore used to protect the connections array.
+    sem_init(&(s->updating_connections), 0, 1);
 
     // Initializes the client connections as empty.
     s->client_connections = NULL;
@@ -115,9 +119,6 @@ void *handle_connections(void *s) {
 
     // Stores the server pointer.
     server *serv = (server*)s;
-
-    // Initializes the semaphore used to protect the connections array.
-    sem_init(&(serv->updating_connections), 0, 1);
 
     while(!CLOSE_SERVER_FLAG)
     {
