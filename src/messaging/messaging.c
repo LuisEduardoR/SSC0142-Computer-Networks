@@ -1,8 +1,10 @@
 # include "messaging.h"
 
+# include <stdio.h>
 # include <stdlib.h>
-
 # include <string.h>
+
+# include <errno.h>
 
 # include <fcntl.h>
 
@@ -49,21 +51,34 @@ void check_message(int socket, int *status, char **response_buffer, int *buffer_
         int received_now = recv(socket, temp_buffer, MAX_BLOCK_SIZE, 0);
 
         // Handles no data received.
-        if(received_now < 1) {
+        if(received_now == 0) { // The server or client has disconnected in a ordenerly way.
 
-            if(received_now == 0) { // The server or client has disconnected in a ordenerly way.
                 *status = -1;
                 *response_buffer = NULL;
                 *buffer_size = 0;
                 break;
 
-            } else if(bytes_received == 0) { // No new message.
-                *status = 1;
+        } else if (received_now < 0) {
+
+            if(errno == EAGAIN || errno == EWOULDBLOCK) { 
+            
+                if(bytes_received == 0) { // No new message.
+                    *status = 1;
+                    *response_buffer = NULL;
+                    *buffer_size = 0;
+                    break;
+                } else { // Continues waiting for the message.
+                    continue;   
+                }
+                
+                
+            } else { // Error.
+                *status = -1;
                 *response_buffer = NULL;
                 *buffer_size = 0;
                 break;
             }
-
+            
         }
 
         // Realocates the final buffer.
