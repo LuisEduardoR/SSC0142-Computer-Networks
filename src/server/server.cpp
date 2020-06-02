@@ -3,8 +3,8 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
-# include "server.h"
-# include "../messaging/messaging.h"
+# include "server.hpp"
+# include "../messaging/messaging.hpp"
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -13,7 +13,7 @@
 # include <errno.h>
 
 # include <fcntl.h>
-# include <signal.h>
+# include <csignal>
 # include <semaphore.h>
 # include <pthread.h>
 
@@ -71,7 +71,7 @@ struct SERVER
 // Private function headers, will be declared bellow. ====================================================================
 void *handle_client(void* client);
 void *handle_connections(void *s);
-void close_server();
+void close_server(int signal_num);
 client_connection *server_listen(server *s, int *status);
 void remove_client(client_connection *connection);
 void create_send_message_worker(client_connection *target_socket, char *message, int message_size);
@@ -124,7 +124,7 @@ int server_status(server *s) {
 void server_handle(server* s) {
 
     // Sets the server to be closed when CTRL+C is pressed.
-    signal(SIGINT, close_server);
+    std::signal(SIGINT, close_server);
 
     // Creates a thread to handle new connections.
     pthread_t connection_thread;
@@ -180,6 +180,8 @@ void *handle_connections(void *s) {
         }
 
     }
+
+    return NULL;
 
 }
 
@@ -245,7 +247,7 @@ void *handle_client(void* connect)
 
                 // Creates a new buffer to store the nickname and the message.
                 sending_buffer_size = strlen(nickname_buffer) + strlen(response_buffer) + 1;
-                sending_buffer = malloc(sizeof(char) * sending_buffer_size);
+                sending_buffer = (char*)malloc(sizeof(char) * sending_buffer_size);
 
                 // Constructs the message to be sent.
                 strcpy(sending_buffer, nickname_buffer);
@@ -283,7 +285,9 @@ void *handle_client(void* connect)
     }
 
     // Disconnects the client before exiting this thread.
-    remove_client(client_connect); 
+    remove_client(client_connect);
+
+    return NULL;
 
 }
 
@@ -366,6 +370,8 @@ void *send_message_worker(void * redirect) {
     // Frees the struct with the redirection information and the stored message.
     free(redirected_message->message);
     free(redirected_message);
+
+    return NULL;
     
 }
 
@@ -449,7 +455,7 @@ void remove_client(client_connection *connection) {
 }
 
 // Sets the flag to indicate the server should be closed.
-void close_server() { CLOSE_SERVER_FLAG = 1; }
+void close_server(int signal_num) { CLOSE_SERVER_FLAG = 1; }
 
 // Deletes the server, closing the socket and freeing memory.
 void server_delete(server **s) { 

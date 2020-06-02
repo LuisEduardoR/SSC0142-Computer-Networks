@@ -12,7 +12,7 @@
 # define ACKNOWLEDGE_MESSAGE "/ack"
 
 // Sends data to a socket.
-void send_message(int socket, char *send_buffer, int buffer_size);
+void send_message(int socket, const char *send_buffer, int buffer_size);
 // Tries receiving data from a socket and storing it on a buffer.
 void check_message(int socket, int *status, int need_to_acknowledge, char **receive_buffer, int *buffer_size);
 

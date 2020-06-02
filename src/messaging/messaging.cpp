@@ -1,4 +1,4 @@
-# include "messaging.h"
+# include "messaging.hpp"
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -12,7 +12,7 @@
 # include <sys/socket.h>
 
 // Sends data to a socket.
-void send_message(int socket, char *send_buffer, int buffer_size) {
+void send_message(int socket, const char *send_buffer, int buffer_size) {
 
     // Breaks the message into blocks of a maximum size.
     int sent = 0;

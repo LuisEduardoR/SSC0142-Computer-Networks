@@ -3,8 +3,8 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
-# include "client.h"
-# include "../messaging/messaging.h"
+# include "client.hpp"
+# include "../messaging/messaging.hpp"
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -13,7 +13,7 @@
 # include <errno.h>
 
 # include <fcntl.h>
-# include <signal.h>
+# include <csignal>
 # include <semaphore.h>
 # include <pthread.h>
 
@@ -46,11 +46,11 @@ void show_new_messages(client *c);
 // =======================================================================================================================
 
 // Used to make the client don't close on a CTRL + C;
-void ignore_sigint() {
+void ignore_sigint(int signal_num) {
 
     // Prints a message and resets the signal.
     printf("\nUse the /quit command or input EOF (CTRL+D) to exit!\n");
-    signal(SIGINT, ignore_sigint);
+    std::signal(SIGINT, ignore_sigint);
 
 }
 
@@ -77,7 +77,7 @@ client *client_create() {
 }
 
 // Tries connecting to a server and returns the connection status.
-int client_connect(client *c, char *s_addr, int port_number){
+int client_connect(client *c, const char *s_addr, int port_number){
 
     // Gets an adress for the socket.
     c->server_adress.sin_family = AF_INET;
@@ -103,7 +103,7 @@ int client_get_socket(client *c) {
 void client_handle(client* c) {
 
     // Sets the client to ignore SIGINT displaying a mesage instead.
-    signal(SIGINT, ignore_sigint);
+    std::signal(SIGINT, ignore_sigint);
 
     // Creates a thread to constantly check for new messages.
     pthread_t check_message_thread;
@@ -177,7 +177,8 @@ void client_handle(client* c) {
 
             // Sends the the /ping command to the client, use /new to see if "pong" was received.
             int status;
-            send_message(client_get_socket(c), "/ping", 6);
+            const char *ping = "/ping";
+            send_message(client_get_socket(c), ping, 6);
             printf("\nPing sent to server... Use /new to check for the response!\n");
 
             continue;
@@ -244,6 +245,8 @@ void *client_check_message(void* current_client) {
         free(response_buffer); // Frees the memory used by the buffer if necessary.
 
     }
+
+    return NULL;
 
 }
 

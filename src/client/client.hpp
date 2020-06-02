@@ -11,7 +11,7 @@ typedef struct CLIENT client;
 // Creates a new client with a network socket.
 client *client_create();
 // Tries connecting to a server and returns the connection status.
-int client_connect(client *c, char *s_addr, int port_number);
+int client_connect(client *c, const char *s_addr, int port_number);
 // Gets the client socket.
 int client_get_socket(client *c);
 // Handles the client instance (control of the program is given to the client until it disconnects).
