@@ -139,7 +139,7 @@ void handle_connections(server *serv) {
             // Handles creating the new connection and adding it to the array in a thread safe way. ----------------------------------------------------------V
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            while(!serv->updating_connections.try_lock());
+            serv->updating_connections.lock();
 
             // ENTER CRITICAL REGION =======================================
 
@@ -175,7 +175,7 @@ void handle_client(client_connection *client_connect) {
         if(status == 0) { // A message was received and must be redirected.
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            while(!client_connect->server_instance->updating_connections.try_lock());
+            client_connect->server_instance->updating_connections.lock();
 
             // ENTER CRITICAL REGION =======================================
 
@@ -190,7 +190,7 @@ void handle_client(client_connection *client_connect) {
             } else if(received_message.compare(ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
 
                 // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-                while(!client_connect->updating_received_message_status.try_lock());
+                client_connect->updating_received_message_status.lock();
 
                 // ENTER CRITICAL REGION =======================================
 
@@ -254,7 +254,7 @@ void send_message_worker(redirect_message *redirect) {
     redirect_message *redirected_message = (redirect_message*)redirect;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    while(!redirected_message->target_client->updating_received_message_status.try_lock());
+    redirected_message->target_client->updating_received_message_status.lock();
 
     // ENTER CRITICAL REGION =======================================
 
@@ -280,7 +280,7 @@ void send_message_worker(redirect_message *redirect) {
         usleep(ACKNOWLEDGE_WAIT_TIME);
 
         // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        while(!redirected_message->target_client->updating_received_message_status.try_lock());
+        redirected_message->target_client->updating_received_message_status.lock();
 
         // ENTER CRITICAL REGION =======================================
 
@@ -345,7 +345,7 @@ void remove_client(client_connection *connection) {
 
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    while(!connection->server_instance->updating_connections.try_lock());
+    connection->server_instance->updating_connections.lock();
 
     // ENTER CRITICAL REGION =======================================
 

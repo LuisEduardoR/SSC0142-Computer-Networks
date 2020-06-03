@@ -110,7 +110,7 @@ void client::handle() {
 
             std::cout << std::endl << "Checking for new messages..." << std::endl << std::endl;
             // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
-            while(!this->updating_messages.try_lock()); // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+            this->updating_messages.lock(); // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
             // ENTER CRITICAL REGION ============================================================================================================================
             show_new_messages();
             // EXIT CRITICAL REGION =============================================================================================================================
@@ -183,7 +183,7 @@ void client_check_message(client *current_client) {
             // Handles showing the new messages in a thread safe way. ------------------------------------------------------------------------------------------V
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            while(!current_client->updating_messages.try_lock());
+            current_client->updating_messages.lock();
 
             // Transfers the response buffer to the new message list.
             current_client->new_messages.push_back(response_message);
