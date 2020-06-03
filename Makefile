@@ -13,15 +13,19 @@ OUTPUT = trabalho-redes
 
 # Creates an object from the main program funcion.
 main:
+	mkdir -p $(OBJ_DIR)
 	$(CC) -c $(SRC_DIR)/main.c $(FLAGS) $(LINKER_FLAGS) -o $(OBJ_DIR)/main.o
 # Creates the object with with the code handle a client instance.
 client:
+	mkdir -p $(OBJ_DIR)
 	$(CC) -c $(SRC_DIR)/client/*.c $(FLAGS) $(LINKER_FLAGS) -o $(OBJ_DIR)/client.o
 # Creates the object with the code to handle a server instance.
 server:
+	mkdir -p $(OBJ_DIR)
 	$(CC) -c $(SRC_DIR)/server/*.c $(FLAGS) $(LINKER_FLAGS) -o $(OBJ_DIR)/server.o
 # Creates an object with the code to handle the messaging between server and clients.
 messaging:
+	mkdir -p $(OBJ_DIR)
 	$(CC) -c $(SRC_DIR)/messaging/*.c $(FLAGS) $(LINKER_FLAGS) -o $(OBJ_DIR)/messaging.o
 # Links all objects on the $(OBJ_DIR) to make the final executable.
 link:

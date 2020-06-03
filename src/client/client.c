@@ -151,7 +151,10 @@ void client_handle(client* c) {
 
             // Receives the message to be sent to the server. A buffer with appropriate size is allocated and must be freed later!
             char *msg_buffer;
-            scanf(" %m[^\n\r]", &msg_buffer);
+            if(scanf(" %m[^\n\r]", &msg_buffer) == EOF) { // Scans the message, checks for EOF and finishes the program in that case.
+                 CLOSE_CLIENT_FLAG = 1;
+                continue;
+            }
 
             // Checks if the message is valid.
             if(msg_buffer[0] == '/') {
@@ -159,7 +162,6 @@ void client_handle(client* c) {
             } else {
 
                 // Sends the message to the server to be redirected to the other clients.
-                int status;
                 send_message(client_get_socket(c), msg_buffer, 1 + strlen(msg_buffer));
                 printf("\nMessage sent to server...\n");
 
@@ -176,7 +178,6 @@ void client_handle(client* c) {
         if(strcmp(command_buffer, "/ping") == 0) {
 
             // Sends the the /ping command to the client, use /new to see if "pong" was received.
-            int status;
             send_message(client_get_socket(c), "/ping", 6);
             printf("\nPing sent to server... Use /new to check for the response!\n");
 
@@ -244,6 +245,8 @@ void *client_check_message(void* current_client) {
         free(response_buffer); // Frees the memory used by the buffer if necessary.
 
     }
+
+    return NULL;
 
 }
 

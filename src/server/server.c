@@ -178,6 +178,8 @@ void *handle_connections(void *s) {
 
     }
 
+    return NULL;
+
 }
 
 void *handle_client(void* connect)
@@ -248,16 +250,9 @@ void *handle_client(void* connect)
                 strcpy(sending_buffer, nickname_buffer);
                 strcpy(sending_buffer + strlen(nickname_buffer), response_buffer);
 
-                // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-                int skipped_sender = 0; // Used to mark if the thread that originally send this message has already being skipped when creating the worker threads.
-                for(int i = 0; i < client_connect->server_instance->client_connections_count; i++) {
-
-                    // Redirects the message to all clients, with the exception of the source.
-                    if(client_connect->server_instance->client_connections[i] != client_connect)
-                        create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
-                    else // Marks that the source client has been skiped (Used to correctly place the worker threads in the array).
-                        skipped_sender = 1;
-                }
+                // Sends the message to all the clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
+                for(int i = 0; i < client_connect->server_instance->client_connections_count; i++)
+                    create_send_message_worker(client_connect->server_instance->client_connections[i], sending_buffer, sending_buffer_size);
 
             }
 
@@ -283,7 +278,9 @@ void *handle_client(void* connect)
     }
 
     // Disconnects the client before exiting this thread.
-    remove_client(client_connect); 
+    remove_client(client_connect);
+
+    return NULL;
 
 }
 
@@ -363,6 +360,8 @@ void *send_message_worker(void * redirect) {
     // Frees the struct with the redirection information and the stored message.
     free(redirected_message->message);
     free(redirected_message);
+
+    return NULL;
     
 }
 
