@@ -17,7 +17,7 @@
 # define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message.
 # define ACKNOWLEDGE_WAIT_TIME 400 // Amount of time the server will wait before an attempt to send a message is failed.
 
-# define CLIENT_ROLE_IDLE -1 // Clientis on the default (idle) channel.
+# define CLIENT_ROLE_IDLE -1 // Clients on the default (idle) channel.
 # define CLIENT_ROLE_NORMAL 0 // Client has a normal role in a channel.
 # define CLIENT_ROLE_ADMIN 1 // Client has an admin role in a channel.
 
@@ -68,6 +68,9 @@ class client_connection
         std::mutex updating_client_connection;
 
         int alive;
+
+        std::string nickname;
+
         int channel;
         int role;
 

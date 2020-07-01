@@ -75,6 +75,9 @@ client_connection::client_connection(int socket, server *server_instance) {
     this->client_socket = socket;
     this->server_instance = server_instance;
 
+    // Initially the nickname comes fron the client socket.
+    this->nickname = "socket " + std::to_string(socket);
+
     // Initially all clients have no channel (but should be put on the idle channel after being created).
     this->channel = -1;
 
@@ -216,11 +219,11 @@ void handle_client(client_connection *client_connect) {
                 client_connect->updating_client_connection.unlock();
 
 
-            } else { // If no command is detected, it's a regular message that needs to be sent to others.
+            } else if (received_message.substr(0,6).compare("/send ") == 0) { // Regular message that needs to be sent to others.
 
                 // Creates a string to be sent, in the format [CHANNEL] NICKNAME:MESSAGE.
                 std::string sending_string =  "[" + client_connect->server_instance->channels[client_connect->channel]->name + "] ";
-                sending_string += std::to_string(client_connect->client_socket) + ": " + received_message;
+                sending_string += client_connect->nickname + ": " + received_message.substr(6,received_message.length());
 
                 // Sends the message to all the other clients on the channel. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
                 for(auto it = client_connect->server_instance->channels[client_connect->channel]->members.begin(); 
@@ -487,7 +490,8 @@ bool channel::add_client(client_connection *client) {
     // Exits the critical region, and opens the semaphore.
     this->updating_members.unlock();
 
-    std::cerr << "Client with socket " << client->client_socket << " is now on channel " << this-> name << "!" << std::endl;
+    std::cerr << "Client with socket " << client->client_socket << " is now on channel " << this-> name << "! ";
+    std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
 
     return true;
 
@@ -522,7 +526,8 @@ bool channel::remove_client(client_connection *client) {
     // Exits the critical region, and opens the semaphore.
     this->updating_members.unlock();
 
-    std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "!" << std::endl;
+    std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "! ";
+    std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
 
     return true;
 

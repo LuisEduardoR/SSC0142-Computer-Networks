@@ -98,15 +98,16 @@ void client::handle() {
 
         // Prints commands.
         std::cout << std::endl << "Enter a command:" << std::endl << std::endl;
-        std::cout << "\t/new\t-\tShows any new messages" << std::endl;
-        std::cout << "\t/send\t-\tSend a message" << std::endl;
-        std::cout << "\t/ping\t-\tThe server answers \"pong\"" << std::endl;
-        std::cout << "\t/quit\t-\tClose the connection and exit the program" << std::endl << std::endl;
+        std::cout << "\t/join\t\t<CHANNEL NAME>\t- Joins a channel" << std::endl;
+        std::cout << "\t/nickname\t<NICKNAME>\t- Change your nickname" << std::endl;
+        std::cout << "\t/send\t\t<MESSAGE>\t- Send a message" << std::endl;
+        std::cout << "\t/ping\t\t\t\t- The server answers \"pong\"" << std::endl;
+        std::cout << "\t/quit\t\t\t\t- Close the connection and exit the program" << std::endl << std::endl;
 
         // Receives commands.
-        std::cin >> command_buffer;
+        std::getline(std::cin, command_buffer);
 
-        if(command_buffer.compare("/new") == 0) {
+        if(command_buffer.substr(0,4).compare("/new") == 0 && command_buffer.length() == std::string("/new").length()) {
 
             std::cout << std::endl << "Checking for new messages..." << std::endl << std::endl;
             // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
@@ -120,31 +121,18 @@ void client::handle() {
 
         }
 
-        if(command_buffer.compare("/send") == 0) {
+        if(command_buffer.substr(0,6).compare("/send ") == 0) {
 
-            std::cout << std::endl << "Enter the message:" << std::endl << std::endl;
-
-            // Receives the message to be sent to the server. A buffer with appropriate size is allocated and must be freed later!
-            std::getc(stdin); // Throws alway the '\n' from the ENTER.
-            std::getline(std::cin, command_buffer);
-
-            // Checks if the message is valid.
-            if(command_buffer[0] == '/') {
-                std::cout << std::endl << "A message can't start with '/'!" << std::endl;
-            } else {
-
-                // Sends the message to the server to be redirected to the other clients.
-                send_message(this->network_socket, command_buffer);
-                std::cout << std::endl << "Message sent to server..." << std::endl;
-
-            }
+            // Sends the message to the server to be redirected to the other clients.
+            send_message(this->network_socket, command_buffer);
+            std::cout << std::endl << "Message sent to server..." << std::endl;
 
             continue;
 
         }
 
 
-        if(command_buffer.compare("/ping") == 0) {
+        if(command_buffer.substr(0,5).compare("/ping") == 0 && command_buffer.length() == std::string("/ping").length()) {
 
             // Sends the the /ping command to the client, use /new to see if "pong" was received.
             std::string ping("/ping");
@@ -155,7 +143,7 @@ void client::handle() {
 
         }
 
-        if(command_buffer.compare("/quit") == 0) {
+        if(command_buffer.substr(0,5).compare("/quit") == 0 && command_buffer.length() == std::string("/quit").length()) {
             CLOSE_CLIENT_FLAG = 1;
             continue;
         }

@@ -13,6 +13,7 @@
 
 class client
 {
+
     public: 
 
         int network_socket;

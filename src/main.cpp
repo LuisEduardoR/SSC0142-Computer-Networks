@@ -83,13 +83,13 @@ int main(int argc, char* argv[])
             std::cout << "\t/quit\t\t-\tExit the program" << std::endl << std::endl;
             
             // Receives commands.
-            std::cin >> command_buffer;
+            std::getline(std::cin, command_buffer);
 
             // Start the server connection process.
             if(command_buffer.compare("/connect") == 0) {
                 
                 std::cout << std::endl << "Enter the server address (default: " << DEFAULT_ADDR << ")" << std::endl << std::endl;
-                std::cin >> command_buffer;
+                std::getline(std::cin, command_buffer);
 
                 if(command_buffer.compare("default") == 0) // Uses the default address.
                     server_addr = DEFAULT_ADDR;
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
                     server_addr = command_buffer;
 
                 std::cout << std::endl << "Enter the server port (default: " << DEFAULT_PORT << ")" << std::endl << std::endl;
-                std::cin >> command_buffer;
+                std::getline(std::cin, command_buffer);
 
                 if(command_buffer.compare("default") == 0) // Uses the default port.
                     server_port = DEFAULT_PORT;
