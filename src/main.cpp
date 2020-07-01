@@ -4,7 +4,7 @@
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
 # include "client/client.hpp"
-# include "server/server.hpp"
+# include "server/main_server.hpp"
 # include "messaging/messaging.hpp"
 
 # include <iostream>
