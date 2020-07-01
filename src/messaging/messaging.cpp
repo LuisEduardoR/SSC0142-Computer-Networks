@@ -17,11 +17,11 @@ void send_message(int socket, std::string &message){
     // Gets the message in the format of an array.
     const char * c_str = message.c_str();
     char *message_data = new char[message.size() + 1];
-    for(int i = 0; i < message.size() + 1; i++)
+    for(size_t i = 0; i < message.size() + 1; i++)
         message_data[i] = c_str[i];
 
     // Breaks the message into blocks of a maximum size.
-    int sent = 0;
+    size_t sent = 0;
     while (sent < (message.length() + 1))
     {
 

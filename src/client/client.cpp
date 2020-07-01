@@ -134,7 +134,6 @@ void client::handle() {
             } else {
 
                 // Sends the message to the server to be redirected to the other clients.
-                int status;
                 send_message(this->network_socket, command_buffer);
                 std::cout << std::endl << "Message sent to server..." << std::endl;
 
@@ -148,7 +147,6 @@ void client::handle() {
         if(command_buffer.compare("/ping") == 0) {
 
             // Sends the the /ping command to the client, use /new to see if "pong" was received.
-            int status;
             std::string ping("/ping");
             send_message(this->network_socket, ping);
             std::cout << std::endl << "Ping sent to server... Use /new to check for the response!" << std::endl;
@@ -214,7 +212,7 @@ void client::show_new_messages() {
         std::cout << "You have new messages:" << std::endl << std::endl;
 
         // Prints the messages.
-        for(int i = 0; i < this->new_messages.size(); i++)
+        for(size_t i = 0; i < this->new_messages.size(); i++)
             std::cout << "- " << this->new_messages[i] << std::endl;
 
         // Empties the new message array.

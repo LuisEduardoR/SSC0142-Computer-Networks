@@ -62,6 +62,10 @@ server::~server() {
     for(auto it = this->connection_threads.begin(); it != this->connection_threads.end(); it++)
         (*it).join();
 
+    // Clears the memory of any remaining channels.
+    for(auto it = this->channels.begin(); it != this->channels.end(); it++)
+        delete (*it);
+
 }
 
 // CONSTRUCTOR
@@ -70,6 +74,9 @@ client_connection::client_connection(int socket, server *server_instance) {
     this->alive = 1;
     this->client_socket = socket;
     this->server_instance = server_instance;
+
+    // Initially all clients have no channel (but should be put on the idle channel after being created).
+    this->channel = -1;
 
 }
 
@@ -97,6 +104,7 @@ redirect_message::redirect_message(int max_resending_attempts, client_connection
     this->message = message;
 
 }
+
 // Private function headers, will be declared bellow. ====================================================================
 void handle_client(client_connection *client_connect);
 void handle_connections(server *serv);
@@ -111,6 +119,9 @@ void server::handle() {
 
     // Sets the server to be closed when CTRL+C is pressed.
     std::signal(SIGINT, close_server);
+
+    // Creates the default idle channel.
+    this->create_channel("idle");
 
     // Creates a thread to handle new connections.
     std::thread connection_thread(handle_connections, this);
@@ -151,6 +162,9 @@ void handle_connections(server *serv) {
             // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
             serv->client_connections.push_back(new_connection);
 
+            // Adds the new client to the idle channel.
+            serv->channels[0]->add_client(new_connection);
+
             // EXIT CRITICAL REGION ========================================
 
             // Exits the critical region, and opens the semaphore.
@@ -190,7 +204,7 @@ void handle_client(client_connection *client_connect) {
             } else if(received_message.compare(ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
 
                 // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-                client_connect->updating_received_message_status.lock();
+                client_connect->updating_client_connection.lock();
 
                 // ENTER CRITICAL REGION =======================================
 
@@ -199,18 +213,33 @@ void handle_client(client_connection *client_connect) {
                 // EXIT CRITICAL REGION ========================================
 
                 // Exits the critical region, and opens the semaphore.
-                client_connect->updating_received_message_status.unlock();
+                client_connect->updating_client_connection.unlock();
 
 
             } else { // If no command is detected, it's a regular message that needs to be sent to others.
 
-                // Creates a string to be sent, in the format NICKNAME:MESSAGE.
-                std::string sending_string =  std::to_string(client_connect->client_socket) + ": " + received_message;
+                // Creates a string to be sent, in the format [CHANNEL] NICKNAME:MESSAGE.
+                std::string sending_string =  "[" + client_connect->server_instance->channels[client_connect->channel]->name + "] ";
+                sending_string += std::to_string(client_connect->client_socket) + ": " + received_message;
 
-                // Sends the message to all the other clients. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
-                for(int i = 0; i < client_connect->server_instance->client_connections.size(); i++) {
-                    // Redirects the message to all clients, with the exception of the source.
-                    create_send_message_worker(client_connect->server_instance->client_connections[i], sending_string);
+                // Sends the message to all the other clients on the channel. Reading this list could cause problems if a new connection is being added or removed, thus a semaphore is used.
+                for(auto it = client_connect->server_instance->channels[client_connect->channel]->members.begin(); 
+                    it != client_connect->server_instance->channels[client_connect->channel]->members.end();
+                    it++) {
+
+                    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+                    client_connect->server_instance->channels[client_connect->channel]->updating_members.lock();
+
+                    // ENTER CRITICAL REGION =======================================
+
+                    // Redirects the message to all clients in the channel.
+                    create_send_message_worker(*it, sending_string);
+
+                    // EXIT CRITICAL REGION ========================================
+
+                    // Exits the critical region, and opens the semaphore.
+                    client_connect->server_instance->channels[client_connect->channel]->updating_members.unlock();
+
                 }
 
             }
@@ -254,7 +283,7 @@ void send_message_worker(redirect_message *redirect) {
     redirect_message *redirected_message = (redirect_message*)redirect;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    redirected_message->target_client->updating_received_message_status.lock();
+    redirected_message->target_client->updating_client_connection.lock();
 
     // ENTER CRITICAL REGION =======================================
 
@@ -263,7 +292,7 @@ void send_message_worker(redirect_message *redirect) {
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    redirected_message->target_client->updating_received_message_status.unlock();
+    redirected_message->target_client->updating_client_connection.unlock();
 
     // Attempt sending the message.
     int success = 0;
@@ -280,7 +309,7 @@ void send_message_worker(redirect_message *redirect) {
         usleep(ACKNOWLEDGE_WAIT_TIME);
 
         // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        redirected_message->target_client->updating_received_message_status.lock();
+        redirected_message->target_client->updating_client_connection.lock();
 
         // ENTER CRITICAL REGION =======================================
 
@@ -290,7 +319,7 @@ void send_message_worker(redirect_message *redirect) {
         // EXIT CRITICAL REGION ========================================
 
         // Exits the critical region, and opens the semaphore.
-        redirected_message->target_client->updating_received_message_status.unlock();
+        redirected_message->target_client->updating_client_connection.unlock();
 
         // Breaks when the message was successfully sent.
         if(success)
@@ -343,6 +372,9 @@ client_connection *server::listen_for_connections(int *status) {
 // Removes a client that has disconnected from the server.
 void remove_client(client_connection *connection) {
 
+    // Removes the client from it's channel.
+    if(connection->channel >= 0)
+        connection->server_instance->channels[connection->channel]->remove_client(connection);
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     connection->server_instance->updating_connections.lock();
@@ -356,7 +388,7 @@ void remove_client(client_connection *connection) {
 
     // Finds the connection that is being removed on the list.
     int found_connection = 0;
-    for(int i = 0; i < connection->server_instance->client_connections.size(); i++)
+    for(size_t i = 0; i < connection->server_instance->client_connections.size(); i++)
         if(connection->server_instance->client_connections[i] == connection)
             found_connection = i;
 
@@ -380,3 +412,118 @@ void remove_client(client_connection *connection) {
 
 // Sets the flag to indicate the server should be closed.
 void close_server(int signal_num) { CLOSE_SERVER_FLAG = true; }
+
+// ======================================================================================================================
+
+//    Channel handling
+
+// ======================================================================================================================
+
+bool server::create_channel(std::string name) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_channels.lock();
+
+    // ENTER CRITICAL REGION =======================================
+
+    // Creates the new channel and adds it to the list.
+    this->channels.push_back(new channel(this->channels.size(), name));
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating_channels.unlock();
+
+    std::cerr << "Channel " << name << " created!" << std::endl;
+
+    return true;
+
+}
+
+// Creates a channel with an index and a name.
+channel::channel(int index, std::string name) {
+
+    this->index = index;
+    this->name = name;
+
+}
+
+bool channel::add_client(client_connection *client) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_members.lock();
+
+    // ENTER CRITICAL REGION =======================================
+
+    // Adds client to the channel.
+    this->members.insert(client);
+    
+    
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    client->updating_client_connection.lock();
+
+        // ENTER CRITICAL REGION =======================================
+
+        client->channel = this->index;
+
+        if(this->index > 0) { // For normal channels.
+            
+            if(this->members.size() == 1)
+                client->role = CLIENT_ROLE_ADMIN; // The first user to join is an admin.
+            else
+                client->role = CLIENT_ROLE_NORMAL; // Other users are normal.
+
+        } else {  // For the idle channel there's a special role.
+            client->role = CLIENT_ROLE_IDLE;
+        }
+
+        // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    client->updating_client_connection.unlock();
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating_members.unlock();
+
+    std::cerr << "Client with socket " << client->client_socket << " is now on channel " << this-> name << "!" << std::endl;
+
+    return true;
+
+}
+
+bool channel::remove_client(client_connection *client) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_members.lock();
+
+    // ENTER CRITICAL REGION =======================================
+
+    // Adds client to the channel.
+    this->members.erase(client);
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    client->updating_client_connection.lock();
+
+        // ENTER CRITICAL REGION =======================================
+
+        // Sets the client channel to none (note that if the client exited the channel orderly it should be sent back to the idle channel).
+        client->channel = -1;
+
+        // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    client->updating_client_connection.unlock();
+    
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating_members.unlock();
+
+    std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "!" << std::endl;
+
+    return true;
+
+}
