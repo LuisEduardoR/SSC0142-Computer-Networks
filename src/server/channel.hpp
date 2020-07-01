@@ -16,6 +16,7 @@
 # include <netinet/in.h>
 
 // Headers for classes in other files that will be used bellow.
+class server;
 class connected_client;
 
 // Struct for a server channel
@@ -24,10 +25,13 @@ class channel
 
     public:
 
+        // Stores an instance to the server this client is connected to.
+        server *server_instance;
+
         int index;
         std::string name;
 
-        channel(int index, std::string name);
+        channel(int index, std::string name, server *server_instance);
 
         std::mutex updating_members;
         std::set<connected_client*> members;

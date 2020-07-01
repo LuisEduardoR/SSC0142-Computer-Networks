@@ -172,8 +172,9 @@ void server::t_check_for_connections() {
 void server::remove_client(connected_client *connection) {
 
     // Removes the client from it's channel.
-    if(connection->channel >= 0)
-        connection->server_instance->channels[connection->channel]->remove_client(connection);
+    int client_channel = connection->get_channel();
+    if(client_channel >= 0)
+        connection->server_instance->channels[client_channel]->remove_client(connection);
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     connection->server_instance->updating_connections.lock();
@@ -216,7 +217,7 @@ bool server::create_channel(std::string name) {
     // ENTER CRITICAL REGION =======================================
 
     // Creates the new channel and adds it to the list.
-    this->channels.push_back(new channel(this->channels.size(), name));
+    this->channels.push_back(new channel(this->channels.size(), name, this));
 
     // EXIT CRITICAL REGION ========================================
 

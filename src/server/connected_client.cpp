@@ -32,6 +32,7 @@ connected_client::connected_client(int socket, server *server_instance) {
     this->kill = false;
     this->client_socket = socket;
     this->server_instance = server_instance;
+    this->ack_received_message = 0;
     // Initially the nickname comes from the client socket.
     this->nickname = "socket " + std::to_string(socket);
     // Initially all clients have no channel (but should be put on the idle channel after being created).
@@ -128,6 +129,9 @@ redirected_message::redirected_message(int max_resending_attempts, std::string m
 // Used by the server to redirect a message to acertain client.
 void connected_client::redirect_message(std::string message) {
 
+    if(this->kill) // Checks if the client is still connected.
+        return;
+
     // Creates a structure to contain the data necessary for the worker thread.
     redirected_message *redirect = new redirected_message(MAX_RESENDING_ATTEMPS, message);
 
@@ -139,6 +143,9 @@ void connected_client::redirect_message(std::string message) {
 
 // Used as a worker thread to redirect messages to a client and check if the client received the message.
 void connected_client::t_redirect_message_worker(redirected_message *redirect) {
+
+    if(this->kill) // Checks if the client is still connected.
+        return;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
@@ -195,4 +202,58 @@ void connected_client::t_redirect_message_worker(redirected_message *redirect) {
     // Deletes the struct with the redirection information and the stored message.
     delete redirect;
     
+}
+
+// Changes the channel this client is connected to.
+bool connected_client::set_channel(int channel, int role) {
+
+    if(this->kill) // Checks if the client is still connected.
+        return false;
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating.lock();
+    // ENTER CRITICAL REGION =======================================
+    this->channel = channel;
+    this->role = role;    
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating.unlock();
+    return true;
+
+}
+
+// Returns the channel this client is conencted to.
+int connected_client::get_channel() {
+
+    if(this->kill) // Checks if the client is still connected.
+        return CLIENT_DEAD;
+
+    int channel;
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating.lock();
+    // ENTER CRITICAL REGION =======================================
+    channel = this->channel;
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating.unlock();
+    return channel;
+
+}
+
+// Returns the role of this client on it's channel.
+int connected_client::get_role() {
+
+    if(this->kill) // Checks if the client is still connected.
+        return CLIENT_DEAD;
+
+    int role;
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating.lock();
+    // ENTER CRITICAL REGION =======================================
+    role = this->role;
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating.unlock();
+    return role;
+
 }
