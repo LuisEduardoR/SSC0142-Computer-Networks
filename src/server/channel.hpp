@@ -25,6 +25,8 @@ class channel
 
     public:
 
+        std::mutex updating;
+
         // Stores an instance to the server this client is connected to.
         server *server_instance;
 
@@ -33,11 +35,13 @@ class channel
 
         channel(int index, std::string name, server *server_instance);
 
-        std::mutex updating_members;
         std::set<connected_client*> members;
 
         bool add_client(connected_client *client);
         bool remove_client(connected_client *client);
+
+        // Posts a message on the channel sending it to all members.
+        void post_message(connected_client *sender, std::string message);
 
     private:
 

@@ -14,7 +14,7 @@
 channel::channel(int index, std::string name, server *server_instance) {
 
     this->index = index;
-    this->name = name;
+    this->name = '#' + name;
     this->server_instance = server_instance;
 
 }
@@ -23,46 +23,43 @@ bool channel::add_client(connected_client *client) {
 
     bool success = false;
 
-    int old_channel; // Stores the client old channel.
+    // Gets the old client channel.
+    int old_channel_index = client->get_channel();
+
+    // If the client is already on this channel, does nothing.
+    if(old_channel_index == this->index)
+        return false;
+
+    // Removes the client from his current channel if his already in one.
+    if(old_channel_index >= 0) {
+
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        this->server_instance->updating_channels.lock();
+
+        // ENTER CRITICAL REGION =======================================
+        this->server_instance->channels[old_channel_index]->remove_client(client);
+        // EXIT CRITICAL REGION ========================================
+
+        // Exits the critical region, and opens the semaphore.
+        this->server_instance->updating_channels.unlock();
+    }
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating_members.lock();
+    this->updating.lock();
 
     // ENTER CRITICAL REGION =======================================
-    
-    // Gets the client's old channel.
-    old_channel = client->get_channel();
-
-    // Gets the role for the client being added.
-    int role;
-    if(this->index > 0) { // For normal channels.
-            
-        if(this->members.size() == 1)
-            role = CLIENT_ROLE_ADMIN; // The first user to join is an admin.
-        else
-            role = CLIENT_ROLE_NORMAL; // Other users are normal.
-
-    } else {  // For the idle channel there's a special role.
-        role = CLIENT_ROLE_IDLE;
-    }
 
     // Sets the client new channel and role.
-    success = client->set_channel(this->index, role);
-    
+    success = client->set_channel(this->index, CLIENT_ROLE_NORMAL);
+
     // Adds client to this channel's members and removes from the old if it has changed channels successfully.
-    if(success) {
-
-        if(old_channel >= 0) // Removes from old channel.
-            this->server_instance->channels[old_channel]->remove_client(client);
-
+    if(success)
         this->members.insert(client); // Add to new channel.
-
-    }
 
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    this->updating_members.unlock();
+    this->updating.unlock();
 
     if(success) {
         std::cerr << "Client with socket " << client->client_socket << " is now on channel " << this-> name << "! ";
@@ -70,7 +67,7 @@ bool channel::add_client(connected_client *client) {
         return true;
     }
     
-    std::cerr << "Error moving client with socket " << client->client_socket << " tp channel " << this-> name << "! ";
+    std::cerr << "Error moving client with socket " << client->client_socket << " to channel " << this-> name << "! ";
     return false;   
 
 }
@@ -80,7 +77,7 @@ bool channel::remove_client(connected_client *client) {
     bool success = false;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating_members.lock();
+    this->updating.lock();
 
     // ENTER CRITICAL REGION =======================================
 
@@ -92,7 +89,7 @@ bool channel::remove_client(connected_client *client) {
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    this->updating_members.unlock();
+    this->updating.unlock();
 
     if(success) {
         std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "! ";
@@ -102,5 +99,35 @@ bool channel::remove_client(connected_client *client) {
 
     std::cerr << "Error removing client with socket " << client->client_socket << " from channel " << this-> name << "! ";
     return false;
+
+    // TODO: Delete the channel if empty.
+
+}
+
+// Posts a message on the channel sending it to all members.
+void channel::post_message(connected_client *sender, std::string message) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating.lock();
+
+    // ENTER CRITICAL REGION =======================================
+    for(auto it = this->members.begin(); it != this->members.end(); it++) {
+
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        (*it)->updating.lock();
+
+        // ENTER CRITICAL REGION =======================================
+        // Creates the worker thread.
+        std::thread worker(&connected_client::t_redirect_message_worker, (*it), new std::string(this->name + " " + message));
+        worker.detach();
+        // EXIT CRITICAL REGION ========================================
+
+        // Exits the critical region, and opens the semaphore.
+        (*it)->updating.unlock();
+    }
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating.unlock();
 
 }

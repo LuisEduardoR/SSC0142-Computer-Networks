@@ -49,7 +49,7 @@ class server
         void t_check_for_connections();
 
         // Creates a new channel on this server.
-        bool create_channel(std::string name);
+        bool create_channel(std::string name, connected_client *admin);
 
         void remove_client(connected_client *connection);
 

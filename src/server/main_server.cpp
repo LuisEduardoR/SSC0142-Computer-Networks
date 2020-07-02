@@ -16,6 +16,7 @@
 
 # include <mutex>
 # include <thread>
+# include <atomic>
 
 # include <sys/types.h>
 # include <sys/socket.h>
@@ -26,10 +27,10 @@
 #include <unistd.h>
 
 // Used to indicate when the server should be closed.
-bool CLOSE_SERVER_FLAG = false;
+std::atomic_bool close_server_flag(false);
 
 // Sets the flag to indicate the server should be closed.
-void close_server(int signal_num) { CLOSE_SERVER_FLAG = true; }
+void close_server(int signal_num) { close_server_flag = true; }
 
 // Creates a new server with a network socket and binds the socket.
 server::server(int port_number) { 
@@ -62,21 +63,8 @@ server::~server() {
     close(this->server_socket);
 
     // Kills all connected clients.
-    for(auto it = this->client_connections.begin(); it != this->client_connections.end(); it++) {
-
-        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        (*it)->updating.lock();
-
-        // ENTER CRITICAL REGION =======================================
-
+    for(auto it = this->client_connections.begin(); it != this->client_connections.end(); it++)
         (*it)->kill = true; // Marks that this clients is to be killed.
-
-        // EXIT CRITICAL REGION ========================================
-
-        // Exits the critical region, and opens the semaphore.
-        (*it)->updating.unlock();
-
-    }
 
     // Joins the threads before exiting.
     for(auto it = this->connection_threads.begin(); it != this->connection_threads.end(); it++)
@@ -94,9 +82,6 @@ void server::handle() {
     // Sets the server to be closed when CTRL+C is pressed.
     std::signal(SIGINT, close_server);
 
-    // Creates the default idle channel.
-    this->create_channel("idle");
-
     // Creates a thread to handle new connections.
     std::thread check_connections_thread(&server::t_check_for_connections, this);
 
@@ -108,14 +93,16 @@ void server::handle() {
 // Used as a thread to check for connecting clients.
 void server::t_check_for_connections() {
 
-    while(!CLOSE_SERVER_FLAG)
+    while(!close_server_flag)
     {
 
         // Listens for a new connection.
         listen(this->server_socket, BACKLOG_LEN);
 
         // Accepts the connection and returns the client socket.
-        int new_client_socket = accept(this->server_socket, nullptr, nullptr);
+        struct sockaddr new_client_address;
+        socklen_t addr_len = sizeof(struct sockaddr);
+        int new_client_socket = accept(this->server_socket, &new_client_address, &addr_len);
 
         // If no connection happened, checks why.
         if(new_client_socket == -1) {
@@ -131,7 +118,7 @@ void server::t_check_for_connections() {
         }
 
         // Creates a new connection object and assigns the socket.
-        connected_client *new_connection = new connected_client(new_client_socket, this);
+        connected_client *new_connection = new connected_client(new_client_socket, new_client_address, addr_len, this);
 
         if(new_connection == nullptr) { // Checks for errors creating the connection.
             std::cerr << "Error creating new connection!" << std::endl;
@@ -153,9 +140,6 @@ void server::t_check_for_connections() {
 
         // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
         this->client_connections.push_back(new_connection);
-
-        // Adds the new client to the idle channel.
-        this->channels[0]->add_client(new_connection);
 
         // EXIT CRITICAL REGION ========================================
 
@@ -181,8 +165,6 @@ void server::remove_client(connected_client *connection) {
 
     // ENTER CRITICAL REGION =======================================
 
-    std::cerr << "Client with socket " << connection->client_socket << " disconnected!" << std::endl;
-
     // Mark that this connection is being removed.
     connection->kill = true;
 
@@ -203,28 +185,46 @@ void server::remove_client(connected_client *connection) {
 
     // Ensures that any thread trying to check if a message was successfully sent has ended.
     usleep(2 * ACKNOWLEDGE_WAIT_TIME);
+
+    std::cerr << "Client with socket " << connection->client_socket << " disconnected!" << std::endl;
     
     // Deletes the current connection.
     delete connection;
 
 }
 
-bool server::create_channel(std::string name) {
+bool server::create_channel(std::string name, connected_client *admin) {
 
+    // TODO: Verify if the channel name is valid!
+
+    // Removes the admin from his current channel if his already in one.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating_channels.lock();
 
     // ENTER CRITICAL REGION =======================================
+    int channel_index = admin->get_channel();
+
+    // Removes the client from the old channel if there is one.
+    if(channel_index >= 0)
+        this->channels[channel_index]->remove_client(admin);
+
+    // Creates the channel.
+    channel *new_channel = new channel(this->channels.size(), name, this);
+
+    // Adds the admin to the channel.
+    new_channel->members.insert(admin);
+    admin->set_channel(new_channel->index, CLIENT_ROLE_ADMIN);
 
     // Creates the new channel and adds it to the list.
-    this->channels.push_back(new channel(this->channels.size(), name, this));
+    this->channels.push_back(new_channel);
 
+    std::cerr << "Channel #" << name << " created!" << std::endl;
+    std::cerr << "Client with socket " << admin->client_socket << " is now on channel " << new_channel->name << " as admin! ";
+    std::cerr << "(Channel members: " << std::to_string(new_channel->members.size()) << ")" << std::endl;
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
     this->updating_channels.unlock();
-
-    std::cerr << "Channel " << name << " created!" << std::endl;
 
     return true;
 

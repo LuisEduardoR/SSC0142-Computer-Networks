@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
                 c->handle();
 
                 // Deletes the client.
-                std::cout << std::endl << "Disconnected!" << std::endl << std::endl;
+                std::cout << std::endl << "Disconnected from the server!" << std::endl << std::endl;
                 delete c;
 
                 // Exits the program.
@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
         s->handle();
 
         // Deletes the server after it's done.
-        std::cout << std::endl << "Disconnected!" << std::endl << std::endl;;
+        std::cout << std::endl << "Server closed!" << std::endl << std::endl;;
         delete s;
 
     } else // Don't do anything for other parameters.

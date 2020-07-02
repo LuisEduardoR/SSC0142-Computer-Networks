@@ -11,6 +11,7 @@
 
 # include <mutex>
 # include <thread>
+# include <atomic>
 
 # include <errno.h>
 
@@ -26,12 +27,7 @@
 #include <unistd.h>
 
 // Used to indicate when the client should be closed.
-int CLOSE_CLIENT_FLAG = 0;
-
-// Private function headers, will be declared bellow. ====================================================================
-void client_check_message(client *current_client);
-void show_new_messages(client *c);
-// =======================================================================================================================
+std::atomic_bool close_client_flag(false);
 
 // Used to make the client don't close on a CTRL + C;
 void ignore_sigint(int signal_num) {
@@ -63,13 +59,13 @@ client::~client() {
 // Tries connecting to a server and returns the connection status.
 int client::connect_to_server(const char *s_addr, int port_number){
 
-    // Gets an adress for the socket.
-    this->server_adress.sin_family = AF_INET;
-    this->server_adress.sin_port = htons(port_number);
-    inet_pton(AF_INET,  s_addr, &(this->server_adress.sin_addr));
+    // Gets an address for the socket.
+    this->server_address.sin_family = AF_INET;
+    this->server_address.sin_port = htons(port_number);
+    inet_pton(AF_INET,  s_addr, &(this->server_address.sin_addr));
 
     // Connects to the server.
-    this->connection_status = connect(this->network_socket, (struct sockaddr *) &(this->server_adress), sizeof(this->server_adress));
+    this->connection_status = connect(this->network_socket, (struct sockaddr *) &(this->server_address), sizeof(this->server_address));
 
     // Returns the status of the connection.
     return this->connection_status;
@@ -83,16 +79,28 @@ void client::handle() {
     std::signal(SIGINT, ignore_sigint);
 
     // Creates a thread to constantly check for new messages.
-    std::thread check_message_thread(client_check_message, this);
+    std::thread server_listen_thread(&client::t_listen_to_server, this);
     
     // Store commands received.
     std::string command_buffer;
+
+    // Asks for a initial nickname on the server.
+    std::cout << std::endl << "Enter a nickname:" << std::endl << std::endl;
+
+    // Receives the nickname.
+    std::getline(std::cin, command_buffer);
+
+    
+    // Sends the nickname to the server.
+    command_buffer = "/nickname " + command_buffer;
+    send_message(this->network_socket, command_buffer);
+    std::cout << std::endl << "Nickname sent to server... Use /new to check for the server response! If your nickname is invalid you will be given a default nickname that can be changed later!" << std::endl;
 
     do {
 
         // Exits on end-of-file.
         if(std::cin.eof()) {
-            CLOSE_CLIENT_FLAG = 1;
+            close_client_flag = true;
             continue;
         }
 
@@ -121,70 +129,76 @@ void client::handle() {
 
         }
 
-        if(command_buffer.substr(0,6).compare("/send ") == 0) {
-
-            // Sends the message to the server to be redirected to the other clients.
-            send_message(this->network_socket, command_buffer);
-            std::cout << std::endl << "Message sent to server..." << std::endl;
-
-            continue;
-
-        }
-
-
-        if(command_buffer.substr(0,5).compare("/ping") == 0 && command_buffer.length() == std::string("/ping").length()) {
-
-            // Sends the the /ping command to the client, use /new to see if "pong" was received.
-            std::string ping("/ping");
-            send_message(this->network_socket, ping);
-            std::cout << std::endl << "Ping sent to server... Use /new to check for the response!" << std::endl;
-
-            continue;
-
-        }
-
+        // Checks for the quit command.
         if(command_buffer.substr(0,5).compare("/quit") == 0 && command_buffer.length() == std::string("/quit").length()) {
-            CLOSE_CLIENT_FLAG = 1;
+            close_client_flag = true;
             continue;
         }
 
-    } while (!CLOSE_CLIENT_FLAG);
+        // Sends all other messages to the server.
+        send_message(this->network_socket, command_buffer);
 
-    // Joins the new message thread before returning.
-    check_message_thread.join();
+        // Prints a message for the /send command
+        if(command_buffer.substr(0,6).compare("/send ") == 0) {
+            std::cout << std::endl << "Message sent to server..." << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /ping command
+        if(command_buffer.substr(0,5).compare("/ping") == 0 && command_buffer.length() == std::string("/ping").length()) {
+            std::cout << std::endl << "Ping sent to server... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /nickname command
+         if(command_buffer.substr(0,10).compare("/nickname ") == 0) {
+            std::cout << std::endl << "Trying to change nickname... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /join command
+         if(command_buffer.substr(0,6).compare("/join ") == 0) {
+            std::cout << std::endl << "Trying to join channel... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+    } while (!close_client_flag);
+
+    // Joins the thead listening for messages message thread before returning.
+    server_listen_thread.join();
 
 }
 
-// Handles checking the client messages on a separate thread.
-void client_check_message(client *current_client) {
+// Handles listening for the server on a separate thread.
+void client::t_listen_to_server() {
 
-    while (!CLOSE_CLIENT_FLAG) {    
+    while (!close_client_flag) {    
 
         // Receives data from the server. A buffer with appropriate size is allocated and must be freed later!
         int status = 0;
-        std::string response_message = check_message(current_client->network_socket, &status, 1);
+        std::string response_message = check_message(this->network_socket, &status, 1);
 
         if(status == 0) {
 
             // Handles showing the new messages in a thread safe way. ------------------------------------------------------------------------------------------V
 
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            current_client->updating_messages.lock();
+            this->updating_messages.lock();
 
             // Transfers the response buffer to the new message list.
-            current_client->new_messages.push_back(response_message);
+            this->new_messages.push_back(response_message);
 
             // EXIT CRITICAL REGION ========================================
 
             // Exits the critical region, and opens the semaphore.
-            current_client->updating_messages.unlock();
+            this->updating_messages.unlock();
 
             // --------------------------------------------------------------------------------------------------------------------------------------------------
 
         } else if (status == 1) { // No new messages.
             // Do nothing.
         } else { // Server was lost.
-            CLOSE_CLIENT_FLAG = 1; // Sets the client to close.
+            close_client_flag = true; // Sets the client to close.
         }
     }
 

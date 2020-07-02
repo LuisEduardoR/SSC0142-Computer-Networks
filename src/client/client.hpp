@@ -30,12 +30,15 @@ class client
         // Handles the client instance (control of the program is given to the client until it disconnects).
         void handle();
 
+        // Constantly listens to the server and does what's necessary.
+        void t_listen_to_server();
+
         // Shows client new messages.
         void show_new_messages();
 
     private:
 
-        struct sockaddr_in server_adress;
+        struct sockaddr_in server_address;
         int connection_status;
 
 };
