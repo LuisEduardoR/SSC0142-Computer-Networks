@@ -105,29 +105,42 @@ bool channel::remove_client(connected_client *client) {
 }
 
 // Posts a message on the channel sending it to all members.
-void channel::post_message(connected_client *sender, std::string message) {
+bool channel::post_message(connected_client *sender, std::string message) {
+
+    bool success = false;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
 
     // ENTER CRITICAL REGION =======================================
-    for(auto it = this->members.begin(); it != this->members.end(); it++) {
 
-        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        (*it)->updating.lock();
+    // Send the message if client isn't muted.
+    if(this->muted.find(sender) == this->muted.end()) {
 
-        // ENTER CRITICAL REGION =======================================
-        // Creates the worker thread.
-        std::thread worker(&connected_client::t_redirect_message_worker, (*it), new std::string(this->name + " " + message));
-        worker.detach();
-        // EXIT CRITICAL REGION ========================================
+        for(auto it = this->members.begin(); it != this->members.end(); it++) {
 
-        // Exits the critical region, and opens the semaphore.
-        (*it)->updating.unlock();
+            // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+            (*it)->updating.lock();
+
+            // ENTER CRITICAL REGION =======================================
+            // Creates the worker thread.
+            std::thread worker(&connected_client::t_redirect_message_worker, (*it), new std::string(this->name + " " + message));
+            worker.detach();
+            // EXIT CRITICAL REGION ========================================
+
+            // Exits the critical region, and opens the semaphore.
+            (*it)->updating.unlock();
+        }
+
+        // Mark that the message has being sent.
+        success = true;
+
     }
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
     this->updating.unlock();
+
+    return success;
 
 }

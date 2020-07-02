@@ -92,9 +92,13 @@ void connected_client::t_handle() {
                 this->updating.unlock();
                 
                 // Checks if the client is in a valid channel.
-                if (target_channel != nullptr)
-                    target_channel->post_message(this, sending_string); // Post the message on the channel.
-                else // Gives an error if no valid channel was found.
+                if (target_channel != nullptr) {
+                    if(!target_channel->post_message(this, sending_string)) { // Post the message on the channel.
+                        // Sends a message to the client if he's muted and can't send messages.
+                        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you are muted and can't send messages on channel " + target_channel->name + "!"));
+                        worker.detach();
+                    }
+                } else // Gives an error if no valid channel was found.
                     std::cerr << "Error getting client channel!" << std::endl;
 
             // Detects the ping command and sends a "pong" in return.
@@ -110,16 +114,41 @@ void connected_client::t_handle() {
                 // Gets the nickname from the rest of the message.
                 std::string new_nickname = received_message.substr(10,received_message.length());
 
-                bool success = this->set_nickname(new_nickname); // Tries updating the nickname. 
+                // Checks if the nickname doesn't exist on the server.
+                // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+                this->server_instance->updating_connections.lock();
+                // ENTER CRITICAL REGION =======================================
+                bool nickname_exists = false;
+                for(auto it = this->server_instance->client_connections.begin(); it != this->server_instance->client_connections.end(); it++) {
 
-                // Sends a message to the client telling the results.
-                if(success) {
-                    std::cerr << "Client with socket " << this->client_socket << " changed his nickname to " + this->nickname + "." << std::endl;
-                    std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: your nickname was changed to " + new_nickname + "!"));
-                    worker.detach();
-                } else {
-                    std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: invalid nickname!"));
-                    worker.detach();
+                    if((*it)->nickname.compare(new_nickname) == 0) {
+                        nickname_exists = true;
+                        // Sends a message to the client telling the nickname already exists.
+                        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: nickname already exists!"));
+                        worker.detach();
+                        break;
+                    }
+
+                }
+                // EXIT CRITICAL REGION ========================================
+                // Exits the critical region, and opens the semaphore.
+                this->server_instance->updating_connections.unlock();
+
+                // If the nickname doesn't exist, tries setting it.
+                if(!nickname_exists) {
+
+                    bool success = this->set_nickname(new_nickname); // Tries updating the nickname. 
+
+                    // Sends a message to the client telling the results.
+                    if(success) {
+                        std::cerr << "Client with socket " << this->client_socket << " changed his nickname to " + this->nickname + "." << std::endl;
+                        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: your nickname was changed to " + new_nickname + "!"));
+                        worker.detach();
+                    } else {
+                        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: invalid nickname!"));
+                        worker.detach();
+                    }
+
                 }
 
             // Detects the join command, tries joining a channel and sends a message telling the results.
