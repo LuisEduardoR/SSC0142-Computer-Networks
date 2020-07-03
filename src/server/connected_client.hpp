@@ -89,6 +89,9 @@ class connected_client
         // Kicks the client with the given nickname.
         bool kick_client(std::string client_name);
 
+        // Mutes or unmutes the client with the given nickname on the current channel.
+        bool toggle_mute_client(std::string client_name, bool muted);
+
         // Prints the IP of a client to the admin.
         bool whois_client(std::string client_name);
 

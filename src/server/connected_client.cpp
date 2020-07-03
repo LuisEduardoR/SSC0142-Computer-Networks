@@ -99,9 +99,15 @@ void connected_client::t_handle() {
                         this->kick_client(received_message.substr(6,received_message.length()));
 
                     } else if(received_message.substr(0,6).compare("/mute ") == 0) { 
-                        // TODO: mute command.
+                        
+                        // Try muting the client with a certain nickname.
+                        this->toggle_mute_client(received_message.substr(6,received_message.length()), true);
+
                     } else if(received_message.substr(0,8).compare("/unmute ") == 0) { 
-                        // TODO: unmute command.
+                        
+                        // Try unmuting the client with a certain nickname.
+                        this->toggle_mute_client(received_message.substr(8,received_message.length()), false);
+
                     } else if(received_message.substr(0,7).compare("/whois ") == 0) { 
 
                         // Try printing the ip of a certain client.
@@ -466,6 +472,55 @@ bool connected_client::kick_client(std::string client_name) {
 
         // Sends a message with the results.
         std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: kicked " + client_name + "!"));
+        worker.detach();
+
+        return true;
+
+    } else {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
+        worker.detach();
+        return false;
+    }
+
+}
+
+// Mutes the client with the given nickname on the curren channel.
+bool connected_client::toggle_mute_client(std::string client_name, bool muted) {
+
+    // Gets the target client.
+    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
+
+    // If the client wasn't found returns.
+    if(target_client == nullptr) {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
+        worker.detach();
+        return false;
+    }
+
+    // Checks if the this client and the target are on the same channel.
+    int target_channel = this->l_get_channel();
+    if(target_channel == target_client->l_get_channel()) {
+
+        // Checks if the nickname doesn't exist on the server.
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        this->server_instance->updating_channels.lock();
+        // ENTER CRITICAL REGION =======================================
+        
+       // Mutes or unmutes the client on the channel.
+        this->server_instance->channels[target_channel]->l_toggle_mute_client(target_client, muted);
+
+        // EXIT CRITICAL REGION ========================================
+        // Exits the critical region, and opens the semaphore.
+        this->server_instance->updating_channels.unlock();
+
+        // Sends a message with the results.
+        std::thread worker;
+        if(muted)
+            worker = std::thread(&connected_client::t_redirect_message_worker, this, new std::string("server: muted " + client_name + "!"));
+        else
+            worker = std::thread(&connected_client::t_redirect_message_worker, this, new std::string("server: unmuted " + client_name + "!"));
         worker.detach();
 
         return true;

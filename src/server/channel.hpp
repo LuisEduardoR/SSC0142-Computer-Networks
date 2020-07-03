@@ -38,7 +38,7 @@ class channel
         // Stores the channel members.
         std::set<connected_client*> members;
 
-        // Adds and remvoes clients to the members list.
+        // Adds and removes clients to the members list.
         bool add_client(connected_client *client);
         bool remove_client(connected_client *client);
 
@@ -46,8 +46,7 @@ class channel
         std::set<connected_client*> muted;
 
         // Mutes and unmutes clients on the channel.
-        bool mute_client(connected_client *client);
-        bool unmute_client(connected_client *client);
+        bool l_toggle_mute_client(connected_client *client, bool muted);
 
         // Posts a message on the channel sending it to all members.
         bool post_message(connected_client *sender, std::string message);
