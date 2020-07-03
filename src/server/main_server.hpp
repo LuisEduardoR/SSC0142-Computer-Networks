@@ -6,11 +6,9 @@
 # ifndef SERVER_H
 # define SERVER_H
 
-# include <set>
 # include <vector>
 # include <thread>
 # include <mutex>
-# include <semaphore.h>
 # include <netinet/in.h>
 
 # include "channel.hpp"
@@ -38,11 +36,18 @@ class server
         // Handles the server instance (control of the program is given to the server until it finishes).
         void handle();
 
+        // Used to mark that the server connections are being updated.
         std::mutex updating_connections;
+
+        // Stores the client connections.
         std::vector<connected_client*> client_connections;
+        // Stores the client connection handles threads.
         std::vector<std::thread> connection_threads;
 
+        // Used to mark that the server channels are being updated.
         std::mutex updating_channels;
+
+        // Stores the server channels.
         std::vector<channel*> channels;
 
         // Used as a thread to check for connecting clients.
@@ -54,6 +59,7 @@ class server
         // Deletes a new channel on this server.
         bool delete_channel(int index);
 
+        // Removes a client from the server.
         void remove_client(connected_client *connection);
 
 };

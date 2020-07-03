@@ -6,16 +6,14 @@
 # ifndef CONNECTED_CLIENT_H
 # define CONNECTED_CLIENT_H
 
-# include "connected_client.hpp"
-
 # include <set>
-# include <vector>
 
-# include <thread>
 # include <mutex>
 # include <atomic>
 
 # include <netinet/in.h>
+
+# include "connected_client.hpp"
 
 # define MAX_NICKNAME_SIZE 50 // Max size of a connect client's nickname.
 # define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message to a connected client.
@@ -35,6 +33,7 @@ class connected_client
 
     public:
 
+        // CONSTRUCTOR
         connected_client(int socket, struct sockaddr client_address, socklen_t addr_len, server *server_instance);
 
         // Used to lock this client for updates.
@@ -57,11 +56,15 @@ class connected_client
         // Stores the value to check if messages where received and acknowledged.
         std::atomic_int32_t atmc_ack_received_message;
 
+        // Threads =============================================================
+
         // Thread that handles the client connection to the server (used as a thread).
         void t_handle();
 
         // Used as a worker thread to redirect messages to a client and check if the client received the message (used as a thread).
         void t_redirect_message_worker(std::string *message);
+
+        // Gets/sets ============================================================
 
         // Tries updating the player nickname (gets a lock).
         bool l_set_nickname(std::string nickname);
@@ -72,6 +75,17 @@ class connected_client
         int l_get_channel();
         // Returns the role of this client on it's channel (gets a lock).
         int l_get_role();
+
+        // Commands =============================================================
+
+        // Send message on the current channel (gets a lock).
+        bool l_send_to_channel(std::string message);
+
+        // Tries changing the client nickname.
+        bool change_nickname(std::string new_nickname);
+
+        // Tries joining a server channel.
+        bool join_channel(std::string channel_name);
 
     private:
 

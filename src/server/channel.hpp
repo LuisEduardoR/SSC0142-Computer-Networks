@@ -6,14 +6,10 @@
 # ifndef CHANNEL_H
 # define CHANNEL_H
 
-# include "main_server.hpp"
-
 # include <set>
-# include <vector>
-# include <thread>
 # include <mutex>
-# include <semaphore.h>
-# include <netinet/in.h>
+
+# include "main_server.hpp"
 
 // Headers for classes in other files that will be used bellow.
 class server;

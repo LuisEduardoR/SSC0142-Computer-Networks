@@ -25,7 +25,9 @@ class client
         // If admin commands should be shown.
         std::atomic_bool atmc_show_admin_commands;
 
+        // CONSTRUCTOR
         client();
+        // DESTRUCTOR
         ~client();
 
         // Tries connecting to a server and returns the connection status.
