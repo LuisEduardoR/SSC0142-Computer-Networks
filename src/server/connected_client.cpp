@@ -94,14 +94,17 @@ void connected_client::t_handle() {
                 } else if(this->l_get_role() == CLIENT_ROLE_ADMIN) {
 
                     if(received_message.substr(0,6).compare("/kick ") == 0) { 
-                        // TODO: kick command.
+                       
+                        // Try kicking the client with a certain nickname.
+                        this->kick_client(received_message.substr(6,received_message.length()));
+
                     } else if(received_message.substr(0,6).compare("/mute ") == 0) { 
                         // TODO: mute command.
                     } else if(received_message.substr(0,8).compare("/unmute ") == 0) { 
                         // TODO: unmute command.
                     } else if(received_message.substr(0,7).compare("/whois ") == 0) { 
 
-                        // Tries printing the ip of a certain client.
+                        // Try printing the ip of a certain client.
                         this->whois_client(received_message.substr(7,received_message.length()));
 
                     }
@@ -440,6 +443,42 @@ bool connected_client::join_channel(std::string channel_name) {
 
 }
 
+// Kicks the client with the given nickname.
+bool connected_client::kick_client(std::string client_name) {
+
+    // Gets the target client.
+    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
+
+    // If the client wasn't found returns.
+    if(target_client == nullptr) {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
+        worker.detach();
+        return false;
+    }
+
+    // Checks if the this client and the target are on the same channel.
+    if(target_client->l_get_channel() == this->l_get_channel()) {
+
+        // Removes the client.
+        shutdown(target_client->client_socket, SHUT_RDWR);
+        this->server_instance->remove_client(target_client);
+
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: kicked " + client_name + "!"));
+        worker.detach();
+
+        return true;
+
+    } else {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
+        worker.detach();
+        return false;
+    }
+
+}
+
 // Prints the IP of a client to the admin.
 bool connected_client::whois_client(std::string client_name) {
 
@@ -468,8 +507,5 @@ bool connected_client::whois_client(std::string client_name) {
         std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
         worker.detach();
         return false;
-    }
-
-    
-
+    }   
 }

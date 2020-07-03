@@ -97,7 +97,7 @@ bool channel::remove_client(connected_client *client) {
         std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
 
         // Deletes the channel if it's now empty.
-        if(this->members.size() < 1)
+        if(this->members.size() < 1) // !FIXME: channel not being deleted.
             this->server_instance->delete_channel(this->index);
 
         return true;

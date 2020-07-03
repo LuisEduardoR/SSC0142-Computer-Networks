@@ -86,6 +86,9 @@ class connected_client
         // Tries joining a server channel.
         bool join_channel(std::string channel_name);
 
+        // Kicks the client with the given nickname.
+        bool kick_client(std::string client_name);
+
         // Prints the IP of a client to the admin.
         bool whois_client(std::string client_name);
 
