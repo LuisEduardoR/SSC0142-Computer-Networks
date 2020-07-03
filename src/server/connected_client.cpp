@@ -171,6 +171,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
 
         // If the message failed to be sent, decreases the number of attemps remaining.
         attempts--;
+        std::cerr << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << std::endl;
 
     }
 
@@ -274,7 +275,7 @@ std::string connected_client::l_get_ip() {
     // Gets the ip address for the this clients socket.
     struct sockaddr_in sa;
     socklen_t sa_len = sizeof(sa);
-    if(!getsockname(this->client_socket, (struct sockaddr*)(&sa), &sa_len)) {
+    if(!getpeername(this->client_socket, (struct sockaddr*)(&sa), &sa_len)) {
 
         // Gets the ip.
         char *ip_char = inet_ntoa(sa.sin_addr);
@@ -413,7 +414,7 @@ bool connected_client::join_channel(std::string channel_name) {
             worker_enable_commands.detach();
 
             // Sends a message with text to warn the client of the success.
-            std::thread worker_warning(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel #" + channel_name + " as an admin!"));
+            std::thread worker_warning(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel " + channel_name + " as an admin!"));
             worker_warning.detach();
 
         } else {
@@ -427,7 +428,7 @@ bool connected_client::join_channel(std::string channel_name) {
         success = target_channel->add_client(this);
 
         // Sends a message with the results.
-        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel #" + channel_name + "!"));
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel " + channel_name + "!"));
         worker.detach();
 
     }
