@@ -91,7 +91,7 @@ std::string check_message(int socket, int *status, int need_to_acknowledge) {
     } while (received_now < 0 || (received_now == MAX_BLOCK_SIZE && temp_buffer[MAX_BLOCK_SIZE - 1] == '\0'));
     
 
-    // Sends an acknoledgement that the message has being received if necessary.
+    // Sends an acknowledgement that the message has being received if necessary.
     if(need_to_acknowledge) {
         // The acknowledge message.
         std::string ack(ACKNOWLEDGE_MESSAGE);

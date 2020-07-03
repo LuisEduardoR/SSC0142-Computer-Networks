@@ -130,7 +130,7 @@ bool channel::post_message(connected_client *sender, std::string message) {
 
             // ENTER CRITICAL REGION =======================================
             // Creates the worker thread.
-            std::thread worker(&connected_client::t_redirect_message_worker, (*it), new std::string(this->name + " " + message));
+            std::thread worker(&connected_client::t_send_message_worker, (*it), new std::string(this->name + " " + message));
             worker.detach();
             // EXIT CRITICAL REGION ========================================
 

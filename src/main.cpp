@@ -165,8 +165,8 @@ int main(int argc, char* argv[])
             return -1;
         }
         
-        // Checks for errors.
-        int svr_status = s->server_status;
+        // Checks for errors. 
+        int svr_status = s->get_status();
         if(svr_status < 0) {
             std::cerr << "Error connecting to socket! (" << svr_status << ")" << std::endl << std::endl;
             delete s;

@@ -36,10 +36,10 @@ class connected_client
         // CONSTRUCTOR
         connected_client(int socket, server *server_instance);
 
-        // Used to lock this client for updates.
+        /* Used to lock this client for updates. */
         std::mutex updating;
 
-        // If this conenction should be killed, used when the server closes.
+        /* If this conenction should be killed, used when the server closes. */
         std::atomic_bool atmc_kill;
 
         // Nickname for this connected client.
@@ -55,13 +55,22 @@ class connected_client
 
         // Threads =============================================================
 
-        // Thread that handles the client connection to the server (used as a thread).
+        /* Spawns the thread to handle this client's connection */
+        void spawn_handle();
+
+        /* Thread that handles the client connection to the server (used as a thread). */
         void t_handle();
 
-        // Used as a worker thread to redirect messages to a client and check if the client received the message (used as a thread).
-        void t_redirect_message_worker(std::string *message);
+        /* Spawns a thread to handle sending a message to this client. */
+        void l_spawn_send_message_worker(std::string *message);
+
+        /* Used as a worker thread to redirect messages to a client and check if the client received the message (used as a thread). */
+        void t_send_message_worker(std::string *message);
 
         // Gets/sets ============================================================
+
+        // Returns this client's nickname (gets a lock).
+        std::string l_get_nickname();
 
         // Tries updating the player nickname (gets a lock).
         bool l_set_nickname(std::string nickname);
@@ -77,6 +86,7 @@ class connected_client
 
         // Commands =============================================================
 
+        /*
         // Send message on the current channel (gets a lock).
         bool l_send_to_channel(std::string message);
 
@@ -93,12 +103,15 @@ class connected_client
         bool toggle_mute_client(std::string client_name, bool muted);
 
         // Prints the IP of a client to the admin.
-        bool whois_client(std::string client_name);
+        bool whois_client(std::string client_name);*/
 
     private:
 
         // Current channel for this client and his respective role.
         int current_channel, channel_role;
+
+        /* Stores the thread that handles this conenction. */
+        std::thread handle;
 
 };
 

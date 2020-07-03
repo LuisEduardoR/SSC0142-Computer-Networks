@@ -65,10 +65,6 @@ server::~server() {
     for(auto it = this->client_connections.begin(); it != this->client_connections.end(); it++)
         (*it)->atmc_kill = true; // Marks that this clients is to be killed.
 
-    // Joins the threads before exiting.
-    for(auto it = this->connection_threads.begin(); it != this->connection_threads.end(); it++)
-        (*it).join();
-
     // Clears the memory of any remaining channels.
     for(auto it = this->channels.begin(); it != this->channels.end(); it++)
         delete (*it);
@@ -81,11 +77,174 @@ void server::handle() {
     // Sets the server to be closed when CTRL+C is pressed.
     std::signal(SIGINT, close_server);
 
-    // Creates a thread to handle new connections.
-    std::thread check_connections_thread(&server::t_check_for_connections, this);
+    // Spawns the thread that handles client connections.
+    std::thread t_handle_connections(&server::thread_handle_connections, this);
 
-    // Waits for the check for conenctions thread to finish.
-    check_connections_thread.join();
+    // Spawns the thread that handles conencted client requests.
+    std::thread t_handle_requests(&server::thread_handle_requests, this);
+
+    // Waits for the threads to finish before giving control back to the main program.
+    t_handle_connections.join();
+    t_handle_requests.join();
+
+}
+
+/* Returns the status of the server */
+int server::get_status() { return this->server_status; }
+
+/* Handles the connection of new clients */
+void server::thread_handle_connections() {
+
+    // Executes until the server is closed.
+    while(!atmc_close_server_flag) {
+
+        // Listens for a new connection.
+        listen(this->server_socket, BACKLOG_LEN);
+
+        // Accepts the connection and returns the client socket.
+        int new_client_socket = accept(this->server_socket, nullptr, nullptr);
+
+        // If no connection happened, checks why.
+        if(new_client_socket == -1) {
+
+            // No connection is avaliable, nothing to do here.
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+                continue;
+
+            // Other types of errors.
+            std::cerr << "Unidentified connection error!" << std::endl;
+            continue;
+            
+        }
+
+        // Creates a new connection object and assigns the socket.
+        connected_client *new_connection = new connected_client(new_client_socket, this);
+
+        if(new_connection == nullptr) { // Checks for errors creating the connection.
+            std::cerr << "Error creating new connection!" << std::endl;
+            continue;
+        }
+
+        // Spawns the thread to handle the client connection.
+        new_connection->spawn_handle();
+
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        this->updating_clients.lock();
+        // ENTER CRITICAL REGION =======================================
+        /* Adds the new connection to the list, modifying the list can cause problems if some 
+        client handler is reading it at the same time, thus a semaphore is used. */
+        this->clients.insert(new_connection);
+        // EXIT CRITICAL REGION ========================================
+        // Exits the critical region, and opens the semaphore.
+        this->updating_clients.unlock();
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+        std::cerr << "Client just connected with socket " << new_connection->client_socket << "!" << std::endl;
+
+    }
+
+}
+
+/* Handles the execution of client requests. */
+void server::thread_handle_requests() {
+
+     // Executes until the server is closed.
+    while(!atmc_close_server_flag) {
+
+        // Stores if there's currently a request to be processed.
+        bool has_request = false;
+
+        // Stores the request being processed.
+        request current_request;
+
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
+        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+        this->updating_request_queue.lock();
+        // ENTER CRITICAL REGION =======================================
+        /* Tries the first request on the queue, modifying the queue can cause problems if some client
+        handler is also adding a request, thus a semaphore is used. */
+        if(this->request_queue.size() > 0) {
+            current_request = this->request_queue.front(); // Gets the first request on the queue.
+            this->request_queue.pop(); // Removes the request from the queue.
+            has_request = true; // Marks that there's a request.
+        }
+        // EXIT CRITICAL REGION ========================================
+        // Exits the critical region, and opens the semaphore.
+        this->updating_request_queue.unlock();
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+        // If there's no request, does nothing and looks agains.
+        if(!has_request)
+            continue;
+        
+        
+        std::string content = current_request.get_content();
+        // NOTE: /ack and /ping request are handled immediately and are not put on the request queue.
+        // Detects a request to send a message on the client's current channel.
+        if (content.substr(0,6).compare("/send ") == 0) {
+
+            // TODO: send request.
+            // Sends a message to the channel.
+            //this->l_send_to_channel(received_message.substr(6,received_message.length()));
+
+        // Detects the nickname command, tries changing the client nickname and sends a message telling the results.
+        } else if(content.substr(0,10).compare("/nickname ") == 0) { 
+
+            // Looks for the nickname part of the request.
+            std::string nickname = content.substr(10,content.length());
+
+            // Gets the client that sent this request.
+            connected_client *target = this->l_get_client_ref(current_request.get_origin_socket());
+
+            if(target == nullptr) { // !FIXME: always entering here V.
+                std::cerr << "/nickname request cancelled! (Client with socket " << current_request.get_origin_socket() << " is no longer avaliable)";
+                continue;
+            }
+
+            // Executes the request.
+            this->nickname_request(target, nickname);
+
+            
+
+        // Detects the join command, tries joining a channel and sends a message telling the results.
+        } else if(content.compare("/join ") == 0) { 
+
+            // TODO: join request.
+            // Try joining the channel with the name provided.
+            //this->join_channel(received_message.substr(6,received_message.length()));
+        
+        // Checks for the admin commands, if the client is an admin.
+        } else if(content.substr(0,6).compare("/kick ") == 0) { 
+                
+            // TODO: kick request only for admins.
+            // Try kicking the client with a certain nickname.
+            //this->kick_client(received_message.substr(6,received_message.length()));
+
+        } else if(content.substr(0,6).compare("/mute ") == 0) { 
+            
+            // TODO: mute request only for admins.
+            // Try muting the client with a certain nickname.
+            //this->toggle_mute_client(received_message.substr(6,received_message.length()), true);
+
+        } else if(content.substr(0,8).compare("/unmute ") == 0) { 
+            
+            // TODO: unmute request only for admins.
+            // Try unmuting the client with a certain nickname.
+            //this->toggle_mute_client(received_message.substr(8,received_message.length()), false);
+
+        } else if(content.substr(0,7).compare("/whois ") == 0) { 
+
+            // TODO: whois request only for admins.
+            // Try printing the ip of a certain client.
+            //this->whois_client(received_message.substr(7,received_message.length()));
+
+        }       
+
+        // TODO: remove this V.
+        std::cerr << "Would execute request from socket " << current_request.get_origin_socket() << ": \"" << current_request.get_content() << "\"" << std::endl;
+
+    }
 
 }
 
@@ -122,28 +281,23 @@ void server::t_check_for_connections() {
             continue;
         }
 
-        // Initializes the new connection.
-        // Handles creating the new connection and adding it to the array in a thread safe way. ----------------------------------------------------------V
-
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
         // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        this->updating_connections.lock();
-
+        this->updating_clients.lock();
         // ENTER CRITICAL REGION =======================================
-
-        std::cerr << "Client just connected with socket " << new_connection->client_socket << "!" << std::endl;
+        /* Adding a client to the list can cause problems if some thread is trying to search for a 
+        client, thus a semaphore is used. */
+        // Adds the new connection to the list.
+        this->client_connections.push_back(new_connection);
+        // EXIT CRITICAL REGION ========================================
+        // Exits the critical region, and opens the semaphore.
+        this->updating_clients.unlock();
+        // --------------------------------------------------------------------------------------------------------------------------------------------------
 
         // Creates a new thread to handle the connection.
-        this->connection_threads.push_back(std::thread(&connected_client::t_handle, new_connection));
+        new_connection->spawn_handle();
 
-        // Adds the new connection to the list, modifying the list can cause problems if some client handler is reading it at the same time, thus a semaphore is used.
-        this->client_connections.push_back(new_connection);
-
-        // EXIT CRITICAL REGION ========================================
-
-        // Exits the critical region, and opens the semaphore.
-        this->updating_connections.unlock();
-
-        // --------------------------------------------------------------------------------------------------------------------------------------------------
+        std::cerr << "Client just connected with socket " << new_connection->client_socket << "!" << std::endl;
 
     }
 
@@ -152,54 +306,20 @@ void server::t_check_for_connections() {
 // Removes a client that has disconnected from the server.
 void server::remove_client(connected_client *connection) {
 
-    // Removes the client from it's channel.
-    int client_channel = connection->l_get_channel();
-
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating_channels.lock();
-
+    this->updating_clients.lock();
     // ENTER CRITICAL REGION =======================================
-
-    // Unmute client in all channels.
-    for(auto it = this->channels.begin(); it != this->channels.end(); it++)
-        (*it)->l_toggle_mute_client(connection, false);
-
-    // Remove client from his current channel.
-    if(client_channel >= 0)
-        this->channels[client_channel]->remove_client(connection);
-
+    /* removing a client from the list can cause problems if some thread is trying to search for a 
+    client, thus a semaphore is used. */
+    // Removes the connection from the list.
+    this->clients.erase(this->clients.find(connection));
     // EXIT CRITICAL REGION ========================================
-
     // Exits the critical region, and opens the semaphore.
-    this->updating_channels.unlock();
-
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating_connections.lock();
-
-    // ENTER CRITICAL REGION =======================================
-
-    // Mark that this connection is being removed.
-    connection->atmc_kill = true;
-
-    // Finds the connection that is being removed on the list.
-    int found_connection = 0;
-    for(size_t i = 0; i < this->client_connections.size(); i++)
-        if(this->client_connections[i] == connection)
-            found_connection = i;
-
-    // Gets an iterator to the connection that needs to be removed and erases it.
-    std::vector<connected_client*>::iterator iter = this->client_connections.begin() + found_connection;
-    this->client_connections.erase(iter, iter);
-
-    // EXIT CRITICAL REGION ========================================
-
-    // Exits the critical region, and opens the semaphore.
-    this->updating_connections.unlock();
+    this->updating_clients.unlock();
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
 
     std::cerr << "Client with socket " << connection->client_socket << " disconnected!" << std::endl;
-    
-    // Deletes the current connection.
-    delete connection;
 
 }
 
@@ -288,5 +408,103 @@ connected_client *server::l_get_client_by_name(std::string client_nickname) {
     this->updating_connections.unlock();
 
     return client;
+
+}
+
+/* Makes a request to the server, that will be added to the request queue and handled as soon as possible (gets a lock to the request_queue during execution) */
+void server::make_request(request new_request) {
+
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_request_queue.lock();
+    // ENTER CRITICAL REGION =======================================
+    /* Adds the new request to the queue, modifying the queue can cause problems if some client
+    handler is also adding a request or if the server is reading a request to be executed at
+    the same time, thus a semaphore is used. */
+    this->request_queue.push(new_request); // Adds the new request to the queue.
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating_request_queue.unlock();
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+    std::cerr << "New request from socket " << new_request.get_origin_socket() << ": \"" << new_request.get_content() << "\"" << std::endl;
+
+}
+
+/* Returns a reference to a client with a certain socket. (gets a lock to the clients list during execution) */
+connected_client *server::l_get_client_ref(int socket) {
+
+    connected_client *target = nullptr;
+
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_clients.lock();
+    // ENTER CRITICAL REGION =======================================
+    /* Reading the list can cause problems if some thread is trying to add or remove a client,
+    thus a semaphore is used. */
+    // Searches for the client in the list.
+    for(auto it = this->clients.begin(); it != this->clients.end(); it++) {
+        if((*it)->client_socket == socket) {
+            target = (*it);
+            break;
+        }
+    }
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating_clients.unlock();
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // Returns a pointer to the client or nullptr if no client was found.
+    return target;
+
+}
+
+/* Returns a reference to a client with a certain nickname. (gets a lock to the clients list during execution) */
+connected_client *server::l_get_client_ref(std::string &nickname) {
+
+    connected_client *target = nullptr;
+
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_clients.lock();
+    // ENTER CRITICAL REGION =======================================
+    /* Reading the list can cause problems if some thread is trying to add or remove a client,
+    thus a semaphore is used. */
+    // Searches for the client in the list.
+    for(auto it = this->clients.begin(); it != this->clients.end(); it++) {
+        if((*it)->l_get_nickname().compare(nickname) == 0) {
+            target = (*it);
+            break;
+        }
+    }
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating_clients.unlock();
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // Returns a pointer to the client or nullptr if no client was found.
+    return target;
+
+}
+
+// ==============================================================================================================================================================
+// Requests =====================================================================================================================================================
+// ==============================================================================================================================================================
+
+/* Tries changing the nickname of a certain client */
+void server::nickname_request(connected_client *client, std::string &nickname) {
+
+    // Checks if the nickname doesn't exist on the server.
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    if(this->l_get_client_ref(nickname) != nullptr)
+         client->l_spawn_send_message_worker(new std::string("server: this nickname already exists!"));
+
+    bool success = client->l_set_nickname(nickname); // Tries updating the nickname. 
+
+    // Sends a message to the client telling the results.
+    if(success)
+        client->l_spawn_send_message_worker(new std::string("server: your nickname was changed to " + nickname + "!"));
+    else
+        client->l_spawn_send_message_worker(new std::string("server: this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)"));
 
 }
