@@ -29,13 +29,13 @@
 // CONSTRUCTOR
 connected_client::connected_client(int socket, struct sockaddr client_address, socklen_t addr_len, server *server_instance) {
 
-    this->kill = false;
+    this->atmc_kill = false;
     this->client_socket = socket;
     this->client_address = client_address;
     this->addr_len = addr_len;
 
     this->server_instance = server_instance;
-    this->ack_received_message = 0;
+    this->atmc_ack_received_message = 0;
 
     // Initially the nickname comes from the client socket.
     this->nickname = "socket " + std::to_string(socket);
@@ -48,7 +48,7 @@ connected_client::connected_client(int socket, struct sockaddr client_address, s
 // Thread that handles the client connection to the server.
 void connected_client::t_handle() {
 
-    while(!this->kill) {
+    while(!this->atmc_kill) {
 
         // Checks for data from the client. A buffer with appropriate size is allocated and must be freed later!
         int status = 0;
@@ -58,13 +58,8 @@ void connected_client::t_handle() {
 
             if(received_message.compare(ACKNOWLEDGE_MESSAGE) == 0) { // Detects that the client is confirming a received message.
 
-                // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-                this->updating.lock();
-                // ENTER CRITICAL REGION =======================================
-                this->ack_received_message--; // Marks that the client has acknowledge a message. 
-                // EXIT CRITICAL REGION ========================================
-                // Exits the critical region, and opens the semaphore.
-                this->updating.unlock();
+                // Marks that the client has acknowledge a message.
+                this->atmc_ack_received_message--; 
 
             } else if (received_message.substr(0,6).compare("/send ") == 0) { // Detects regular message that needs to be posted in the channel.
 
@@ -200,7 +195,15 @@ void connected_client::t_handle() {
                 }
             } else if(this->l_get_role() == CLIENT_ROLE_ADMIN) { // Checks for the admin commands, if the client is an admin.
 
-                // TODO: admin commands.
+                if(received_message.substr(0,6).compare("/kick ") == 0) { 
+                    // TODO: kick command.
+                } else if(received_message.substr(0,6).compare("/mute ") == 0) { 
+                    // TODO: mute command.
+                } else if(received_message.substr(0,8).compare("/unmute ") == 0) { 
+                    // TODO: unmute command.
+                } else if(received_message.substr(0,7).compare("/whois ") == 0) { 
+                    // TODO: whois command.
+                }
 
             }
 
@@ -222,20 +225,11 @@ void connected_client::t_handle() {
 // Used as a worker thread to redirect messages to a client and check if the client received the message.
 void connected_client::t_redirect_message_worker(std::string *message) {
 
-    if(this->kill) // Checks if the client is still connected.
+    if(this->atmc_kill) // Checks if the client is still connected.
         return;
 
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating.lock();
-
-    // ENTER CRITICAL REGION =======================================
-
-    this->ack_received_message++; // Marks that this clients needs to acknowledges that a message has being received.
-
-    // EXIT CRITICAL REGION ========================================
-
-    // Exits the critical region, and opens the semaphore.
-    this->updating.unlock();
+    // Marks that this clients needs to acknowledges that a message has being received.
+    this->atmc_ack_received_message++;
 
     // Marks how many attempts are left for a client to receive and acknowledge this message.
     int attempts = MAX_RESENDING_ATTEMPS;
@@ -244,7 +238,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
     int success = 0;
     while (attempts > 0) {
 
-        if(this->kill) // Checks if the client is still connected.
+        if(this->atmc_kill) // Checks if the client is still connected.
             break;
 
         // Sends the message.
@@ -253,18 +247,9 @@ void connected_client::t_redirect_message_worker(std::string *message) {
         // Sleeps the thread for the desired time to wait for a response.
         usleep(ACKNOWLEDGE_WAIT_TIME);
 
-        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        this->updating.lock();
-
-        // ENTER CRITICAL REGION =======================================
-
-        if(this->ack_received_message < 1) // Marks that all messages were successfully sent.
+        // Marks that all messages were successfully sent.
+        if(this->atmc_ack_received_message < 1)
             success = 1;
-
-        // EXIT CRITICAL REGION ========================================
-
-        // Exits the critical region, and opens the semaphore.
-        this->updating.unlock();
 
         // Breaks when the message was successfully sent.
         if(success)
@@ -279,7 +264,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
     delete message;
 
     // If the client could not confirm the message was received, shut it down.
-    if(!success && !this->kill)
+    if(!success && !this->atmc_kill)
         shutdown(this->client_socket, 2);
     
 }
@@ -287,7 +272,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
 // Tries updating the player nickname.
 bool connected_client::l_set_nickname(std::string nickname) {
 
-    if(this->kill) // Checks if the client is still connected.
+    if(this->atmc_kill) // Checks if the client is still connected.
         return false;
 
     // Checks if the nickname is valid.
@@ -319,7 +304,7 @@ bool connected_client::l_set_nickname(std::string nickname) {
 // Changes the channel this client is connected to.
 bool connected_client::l_set_channel(int channel, int role) {
 
-    if(this->kill) // Checks if the client is still connected.
+    if(this->atmc_kill) // Checks if the client is still connected.
         return false;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -337,7 +322,7 @@ bool connected_client::l_set_channel(int channel, int role) {
 // Returns the channel this client is conencted to.
 int connected_client::l_get_channel() {
 
-    if(this->kill) // Checks if the client is still connected.
+    if(this->atmc_kill) // Checks if the client is still connected.
         return CLIENT_DEAD;
 
     int channel;
@@ -355,7 +340,7 @@ int connected_client::l_get_channel() {
 // Returns the role of this client on it's channel.
 int connected_client::l_get_role() {
 
-    if(this->kill) // Checks if the client is still connected.
+    if(this->atmc_kill) // Checks if the client is still connected.
         return CLIENT_DEAD;
 
     int role;

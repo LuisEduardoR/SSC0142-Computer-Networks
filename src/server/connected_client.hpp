@@ -19,7 +19,7 @@
 
 # define MAX_NICKNAME_SIZE 50 // Max size of a connect client's nickname.
 # define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message to a connected client.
-# define ACKNOWLEDGE_WAIT_TIME 400 // Amount of time the server will wait before an attempt to send a message toa conencted client fails.
+# define ACKNOWLEDGE_WAIT_TIME 400 // Amount of time the server will wait before an attempt to send a message toa connected client fails.
 
 # define CLIENT_DEAD -2 // Client is marked to be "killed".
 # define CLIENT_NO_CHANNEL -1 // Client has no channel.
@@ -41,11 +41,10 @@ class connected_client
         std::mutex updating;
 
         // If this conenction should be killed, used when the server closes.
-        std::atomic_bool kill;
+        std::atomic_bool atmc_kill;
 
         // Nickname for this connected client.
         std::string nickname;
-
         // Stores an instance to the server this client is connected to.
         server *server_instance;
 
@@ -56,7 +55,7 @@ class connected_client
         socklen_t addr_len;
 
         // Stores the value to check if messages where received and acknowledged.
-        int ack_received_message;
+        std::atomic_int32_t atmc_ack_received_message;
 
         // Thread that handles the client connection to the server (used as a thread).
         void t_handle();

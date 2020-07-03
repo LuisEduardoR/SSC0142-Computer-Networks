@@ -27,10 +27,10 @@
 #include <unistd.h>
 
 // Used to indicate when the server should be closed.
-std::atomic_bool close_server_flag(false);
+std::atomic_bool atmc_close_server_flag(false);
 
 // Sets the flag to indicate the server should be closed.
-void close_server(int signal_num) { close_server_flag = true; }
+void close_server(int signal_num) { atmc_close_server_flag = true; }
 
 // Creates a new server with a network socket and binds the socket.
 server::server(int port_number) { 
@@ -64,7 +64,7 @@ server::~server() {
 
     // Kills all connected clients.
     for(auto it = this->client_connections.begin(); it != this->client_connections.end(); it++)
-        (*it)->kill = true; // Marks that this clients is to be killed.
+        (*it)->atmc_kill = true; // Marks that this clients is to be killed.
 
     // Joins the threads before exiting.
     for(auto it = this->connection_threads.begin(); it != this->connection_threads.end(); it++)
@@ -93,7 +93,7 @@ void server::handle() {
 // Used as a thread to check for connecting clients.
 void server::t_check_for_connections() {
 
-    while(!close_server_flag)
+    while(!atmc_close_server_flag)
     {
 
         // Listens for a new connection.
@@ -166,7 +166,7 @@ void server::remove_client(connected_client *connection) {
     // ENTER CRITICAL REGION =======================================
 
     // Mark that this connection is being removed.
-    connection->kill = true;
+    connection->atmc_kill = true;
 
     // Finds the connection that is being removed on the list.
     int found_connection = 0;

@@ -23,7 +23,7 @@ class client
         std::vector<std::string> new_messages;
 
         // If admin commands should be shown.
-        std::atomic_bool show_admin_commands;
+        std::atomic_bool atmc_show_admin_commands;
 
         client();
         ~client();

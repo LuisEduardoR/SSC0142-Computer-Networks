@@ -27,7 +27,7 @@
 #include <unistd.h>
 
 // Used to indicate when the client should be closed.
-std::atomic_bool close_client_flag(false);
+std::atomic_bool atmc_close_client_flag(false);
 
 // Used to make the client don't close on a CTRL + C;
 void ignore_sigint(int signal_num) {
@@ -45,7 +45,7 @@ client::client() {
     this->network_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     // Doesn't show admin commands at start.
-    this->show_admin_commands = false;
+    this->atmc_show_admin_commands = false;
 
     // Initializes the client new messages as empty.
     this->new_messages.clear();
@@ -103,7 +103,7 @@ void client::handle() {
 
         // Exits on end-of-file.
         if(std::cin.eof()) {
-            close_client_flag = true;
+            atmc_close_client_flag = true;
             continue;
         }
 
@@ -116,7 +116,7 @@ void client::handle() {
         std::cout << "\t/quit\t\t\t\t- Close the connection and exit the program" << std::endl << std::endl;
 
         // Prints admin commands if necessary.
-        if(show_admin_commands) {
+        if(atmc_show_admin_commands) {
             std::cout << "\tAdmin:" << std::endl;
             std::cout << "\t/mute\t\t<NICKNAME>\t- Mutes an user on the current channel" << std::endl;
             std::cout << "\t/unmute\t\t<NICKNAME>\t- Un-mutes an user on the current channel" << std::endl;
@@ -143,7 +143,7 @@ void client::handle() {
 
         // Checks for the quit command.
         if(command_buffer.substr(0,5).compare("/quit") == 0 && command_buffer.length() == std::string("/quit").length()) {
-            close_client_flag = true;
+            atmc_close_client_flag = true;
             continue;
         }
 
@@ -174,7 +174,7 @@ void client::handle() {
             continue;
         }
 
-    } while (!close_client_flag);
+    } while (!atmc_close_client_flag);
 
     // Joins the thead listening for messages message thread before returning.
     server_listen_thread.join();
@@ -184,7 +184,7 @@ void client::handle() {
 // Handles listening for the server on a separate thread.
 void client::t_listen_to_server() {
 
-    while (!close_client_flag) {    
+    while (!atmc_close_client_flag) {    
 
         // Receives data from the server. A buffer with appropriate size is allocated and must be freed later!
         int status = 0;
@@ -198,9 +198,9 @@ void client::t_listen_to_server() {
             this->updating_messages.lock();
 
             if(response_message.compare("/show_admin_commands") == 0) { // Client is now an admin, show admin commands.
-                this->show_admin_commands = true;
+                this->atmc_show_admin_commands = true;
             } else if(response_message.compare("/show_admin_commands") == 0) { // Client is no longer an admin, hide admin commands
-                this->show_admin_commands = false;
+                this->atmc_show_admin_commands = false;
             } else { // Regular message, transfers to the new message list.
                 this->new_messages.push_back(response_message);
 
@@ -217,7 +217,7 @@ void client::t_listen_to_server() {
         } else if (status == 1) { // No new messages.
             // Do nothing.
         } else { // Server was lost.
-            close_client_flag = true; // Sets the client to close.
+            atmc_close_client_flag = true; // Sets the client to close.
         }
     }
 
