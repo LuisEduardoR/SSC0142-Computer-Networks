@@ -11,6 +11,8 @@
 
 # include "main_server.hpp"
 
+# define MAX_CHANNEL_NAME_SIZE 200 // Max size of a channel name.
+
 // Headers for classes in other files that will be used bellow.
 class server;
 class connected_client;

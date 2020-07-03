@@ -155,8 +155,24 @@ void server::remove_client(connected_client *connection) {
 
     // Removes the client from it's channel.
     int client_channel = connection->l_get_channel();
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_channels.lock();
+
+    // ENTER CRITICAL REGION =======================================
+
+    // Unmute client in all channels.
+    for(auto it = this->channels.begin(); it != this->channels.end(); it++)
+        (*it)->l_toggle_mute_client(connection, false);
+
+    // Remove client from his current channel.
     if(client_channel >= 0)
         this->channels[client_channel]->remove_client(connection);
+
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating_channels.unlock();
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating_connections.lock();
@@ -193,7 +209,18 @@ void server::remove_client(connected_client *connection) {
 
 bool server::create_channel(std::string name, connected_client *admin) {
 
-    // TODO: Verify if the channel name is valid!
+    // Checks if the channel name is valid.
+    if(name.length() > MAX_CHANNEL_NAME_SIZE) // Checks for valid size.
+        return false;
+    // Checks for a valid channel name.
+    // It has to start with one of the following characters.
+    if(name[0] != '&' && name[0] != '#')
+        return false;
+    //It can't contain any of the following characters.
+    for(auto it = name.begin(); it != name.end(); it++) { 
+        if(*it == ' ' || *it == 7 || *it == ',')
+            return false;
+    }
 
     // Removes the admin from his current channel if his already in one.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -216,7 +243,7 @@ bool server::create_channel(std::string name, connected_client *admin) {
     // Creates the new channel and adds it to the list.
     this->channels.push_back(new_channel);
 
-    std::cerr << "Channel #" << name << " created!" << std::endl;
+    std::cerr << "Channel " << name << " created!" << std::endl;
     std::cerr << "Client with socket " << admin->client_socket << " is now on channel " << new_channel->name << " as admin! ";
     std::cerr << "(Channel members: " << std::to_string(new_channel->members.size()) << ")" << std::endl;
     // EXIT CRITICAL REGION ========================================

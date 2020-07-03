@@ -194,18 +194,17 @@ bool connected_client::l_set_nickname(std::string nickname) {
         return false;
 
     // Checks if the nickname is valid.
-    bool has_alphanum = false;
     if(nickname.length() > MAX_NICKNAME_SIZE) // Checks for valid size.
         return false;
-    // Checks for valid characters, alphanumerical, spaces, parentesis and dashes.
+    // Checks for a valid nickname.
+    // It must not start with any of the following characters.
+    if(nickname[0] == '&' || nickname[0] == '#')
+        return false;
+    // It can't contain any of the following characters.
     for(auto it = nickname.begin(); it != nickname.end(); it++) { 
-        if(std::isalnum(*it)) // Marks if the character is alphanumerical
-            has_alphanum = true;
-        else if(!(*it == ' ' || *it == '_' || *it == '-' || *it == '(' || *it == ')')) // Otherwise it must be one of this symbols.
+        if(*it == ' ' || *it == 7 || *it == ',')
             return false;
     }
-    if(!has_alphanum) // Ensures at least one character is alphanumerical.
-        return false;
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
@@ -222,9 +221,6 @@ bool connected_client::l_set_nickname(std::string nickname) {
 // Changes the channel this client is connected to.
 bool connected_client::l_set_channel(int channel, int role) {
 
-    if(this->atmc_kill) // Checks if the client is still connected.
-        return false;
-
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
     // ENTER CRITICAL REGION =======================================
@@ -239,9 +235,6 @@ bool connected_client::l_set_channel(int channel, int role) {
 
 // Returns the channel this client is conencted to.
 int connected_client::l_get_channel() {
-
-    if(this->atmc_kill) // Checks if the client is still connected.
-        return CLIENT_DEAD;
 
     int channel;
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -258,9 +251,6 @@ int connected_client::l_get_channel() {
 // Returns the role of this client on it's channel.
 int connected_client::l_get_role() {
 
-    if(this->atmc_kill) // Checks if the client is still connected.
-        return CLIENT_DEAD;
-
     int role;
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
@@ -275,9 +265,6 @@ int connected_client::l_get_role() {
 
 // Returns the ip of this client as a string (gets a lock).
 std::string connected_client::l_get_ip() {
-
-    if(this->atmc_kill) // Checks if the client is still connected.
-        return nullptr;
 
     std::string ip;
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -388,7 +375,7 @@ bool connected_client::change_nickname(std::string new_nickname) {
             std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: your nickname was changed to " + new_nickname + "!"));
             worker.detach();
         } else {
-            std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: invalid nickname!"));
+            std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: invalid nickname! (It can't start with '#' or '&' and must not contain spaces or commas)"));
             worker.detach();
         }
     }
@@ -430,7 +417,7 @@ bool connected_client::join_channel(std::string channel_name) {
             worker_warning.detach();
 
         } else {
-            std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the channel #" + channel_name + "doesn't exist and can't be created! (Invalid name)"));
+            std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the channel " + channel_name + " doesn't exist and can't be created! (Invalid name: it has to start with either '#' or '&' and must not contain spaces or commas)"));
             worker.detach();
         }
 
@@ -494,8 +481,8 @@ bool connected_client::toggle_mute_client(std::string client_name, bool muted) {
     // If the client wasn't found returns.
     if(target_client == nullptr) {
         // Sends a message with the results.
-        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
-        worker.detach();
+        std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
+        admin_worker.detach();
         return false;
     }
 
@@ -506,29 +493,61 @@ bool connected_client::toggle_mute_client(std::string client_name, bool muted) {
         // Checks if the nickname doesn't exist on the server.
         // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
         this->server_instance->updating_channels.lock();
-        // ENTER CRITICAL REGION =======================================
-        
+        // ENTER CRITICAL REGION =======================================   
        // Mutes or unmutes the client on the channel.
-        this->server_instance->channels[target_channel]->l_toggle_mute_client(target_client, muted);
-
+        bool success = this->server_instance->channels[target_channel]->l_toggle_mute_client(target_client, muted);
+        std::string target_channel_name = this->server_instance->channels[target_channel]->name;
         // EXIT CRITICAL REGION ========================================
         // Exits the critical region, and opens the semaphore.
         this->server_instance->updating_channels.unlock();
 
         // Sends a message with the results.
-        std::thread worker;
-        if(muted)
-            worker = std::thread(&connected_client::t_redirect_message_worker, this, new std::string("server: muted " + client_name + "!"));
-        else
-            worker = std::thread(&connected_client::t_redirect_message_worker, this, new std::string("server: unmuted " + client_name + "!"));
-        worker.detach();
+        if(muted) {
 
-        return true;
+            if(success) {
+
+                // Creates the worker thread for the admin.
+                std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: muted " + client_name + "!"));
+                admin_worker.detach();
+
+                // Creates the worker thread for the target.
+                std::thread target_worker(&connected_client::t_redirect_message_worker, target_client, new std::string("server: you have been muted on channel " + target_channel_name + "!"));
+                target_worker.detach();
+            } else {
+
+                // Creates the worker thread for the admin.
+                std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: " + client_name + " is already muted!"));
+                admin_worker.detach();
+
+            }
+
+        } else {
+
+            if(success) {
+
+                // Creates the worker thread for the admin.
+                std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: un-muted " + client_name + "!"));
+                admin_worker.detach();
+
+                // Creates the worker thread for the target.
+                std::thread target_worker(&connected_client::t_redirect_message_worker, target_client, new std::string("server: you have been un-muted on channel " + target_channel_name + "!"));
+                target_worker.detach();
+
+            } else {
+
+                // Creates the worker thread for the admin.
+                std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: " + client_name + " isn't muted!"));
+                admin_worker.detach();
+
+            }
+        }
+
+        return success;
 
     } else {
         // Sends a message with the results.
-        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
-        worker.detach();
+        std::thread admin_worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
+        admin_worker.detach();
         return false;
     }
 

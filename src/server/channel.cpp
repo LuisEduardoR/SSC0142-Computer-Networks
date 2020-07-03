@@ -14,7 +14,7 @@
 channel::channel(int index, std::string name, server *server_instance) {
 
     this->index = index;
-    this->name = '#' + name;
+    this->name = name;
     this->server_instance = server_instance;
 
 }
@@ -72,7 +72,7 @@ bool channel::add_client(connected_client *client) {
 
 }
 
-// !FIXME: client not being removed!
+// Removes client from the members list.
 bool channel::remove_client(connected_client *client) {
 
     bool success = false;
@@ -154,6 +154,8 @@ bool channel::post_message(connected_client *sender, std::string message) {
 // Mutes and unmutes clients on the channel.
 bool channel::l_toggle_mute_client(connected_client *client, bool muted) {
 
+    bool success = false;
+
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     this->updating.lock();
 
@@ -163,29 +165,20 @@ bool channel::l_toggle_mute_client(connected_client *client, bool muted) {
 
         // ENTER CRITICAL REGION =======================================
 
-        // TODO: Remove client from muted list when disconnecting.
-
         if(muted) {
-
-            // TODO: Don't mute client if already muted.
-
-            // Adds the client to the muted list.
-            this->muted.insert(client);
-
-            // Creates the worker thread.
-            std::thread worker(&connected_client::t_redirect_message_worker, client, new std::string("server: you have been muted on channel " + this->name + "!"));
-            worker.detach();
+            // Adds the client to the muted list if it's not currently there.
+            if(this->muted.find(client) == this->muted.end()) {
+                this->muted.insert(client);
+                success = true;
+            }
 
         } else {
-
-            // TODO: Don't unmute client if not muted.
-
-            // Removes the client from the muted list.
-            this->muted.erase(this->muted.find(client));
-
-            // Creates the worker thread.
-            std::thread worker(&connected_client::t_redirect_message_worker, client, new std::string("server: you have been un-muted on channel " + this->name + "!"));
-            worker.detach();
+            // Removes the client from the muted list if it's currently there.
+            auto it = this->muted.find(client);
+            if(it != this->muted.end()) {
+                this->muted.erase(it);
+                success = true;
+            }
 
         }
         // EXIT CRITICAL REGION ========================================
@@ -197,6 +190,6 @@ bool channel::l_toggle_mute_client(connected_client *client, bool muted) {
     // Exits the critical region, and opens the semaphore.
     this->updating.unlock();
 
-    return true;
+    return success;
 
 }
