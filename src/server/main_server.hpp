@@ -62,6 +62,9 @@ class server
         // Removes a client from the server.
         void remove_client(connected_client *connection);
 
+        // Gets a reference to a client with a certain nickname (gets lock).
+        connected_client *l_get_client_by_name(std::string client_nickname);
+
 };
 
 # endif

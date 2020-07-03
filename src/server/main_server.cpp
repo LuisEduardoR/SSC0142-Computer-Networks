@@ -100,9 +100,7 @@ void server::t_check_for_connections() {
         listen(this->server_socket, BACKLOG_LEN);
 
         // Accepts the connection and returns the client socket.
-        struct sockaddr new_client_address;
-        socklen_t addr_len = sizeof(struct sockaddr);
-        int new_client_socket = accept(this->server_socket, &new_client_address, &addr_len);
+        int new_client_socket = accept(this->server_socket, nullptr, nullptr);
 
         // If no connection happened, checks why.
         if(new_client_socket == -1) {
@@ -118,7 +116,7 @@ void server::t_check_for_connections() {
         }
 
         // Creates a new connection object and assigns the socket.
-        connected_client *new_connection = new connected_client(new_client_socket, new_client_address, addr_len, this);
+        connected_client *new_connection = new connected_client(new_client_socket, this);
 
         if(new_connection == nullptr) { // Checks for errors creating the connection.
             std::cerr << "Error creating new connection!" << std::endl;
@@ -158,10 +156,10 @@ void server::remove_client(connected_client *connection) {
     // Removes the client from it's channel.
     int client_channel = connection->l_get_channel();
     if(client_channel >= 0)
-        connection->server_instance->channels[client_channel]->remove_client(connection);
+        this->channels[client_channel]->remove_client(connection);
 
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    connection->server_instance->updating_connections.lock();
+    this->updating_connections.lock();
 
     // ENTER CRITICAL REGION =======================================
 
@@ -170,18 +168,18 @@ void server::remove_client(connected_client *connection) {
 
     // Finds the connection that is being removed on the list.
     int found_connection = 0;
-    for(size_t i = 0; i < connection->server_instance->client_connections.size(); i++)
-        if(connection->server_instance->client_connections[i] == connection)
+    for(size_t i = 0; i < this->client_connections.size(); i++)
+        if(this->client_connections[i] == connection)
             found_connection = i;
 
     // Gets an iterator to the connection that needs to be removed and erases it.
-    std::vector<connected_client*>::iterator iter = connection->server_instance->client_connections.begin() + found_connection;
-    connection->server_instance->client_connections.erase(iter, iter);
+    std::vector<connected_client*>::iterator iter = this->client_connections.begin() + found_connection;
+    this->client_connections.erase(iter, iter);
 
     // EXIT CRITICAL REGION ========================================
 
     // Exits the critical region, and opens the semaphore.
-    connection->server_instance->updating_connections.unlock();
+    this->updating_connections.unlock();
 
     // Ensures that any thread trying to check if a message was successfully sent has ended.
     usleep(2 * ACKNOWLEDGE_WAIT_TIME);
@@ -242,5 +240,29 @@ bool server::delete_channel(int index) {
     std::cerr << "Channel " << name << " deleted!" << std::endl;
 
     return true;
+
+}
+
+// Gets a reference to a client with a certain nickname.
+connected_client *server::l_get_client_by_name(std::string client_nickname) {
+
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating_connections.lock();
+
+    // ENTER CRITICAL REGION =======================================
+    // Searches for the client with the given nickname on the connected client list.
+    connected_client *client = nullptr;
+    for(auto it = this->client_connections.begin(); it != this->client_connections.end(); it++) {
+        if((*it)->nickname.compare(client_nickname) == 0) {
+            client = (*it);
+            break;
+        }
+    }
+    // EXIT CRITICAL REGION ========================================
+
+    // Exits the critical region, and opens the semaphore.
+    this->updating_connections.unlock();
+
+    return client;
 
 }

@@ -19,15 +19,15 @@
 # include <sys/types.h>
 # include <sys/socket.h>
 
+#include <arpa/inet.h>
+
 #include <unistd.h>
 
 // CONSTRUCTOR
-connected_client::connected_client(int socket, struct sockaddr client_address, socklen_t addr_len, server *server_instance) {
+connected_client::connected_client(int socket, server *server_instance) {
 
     this->atmc_kill = false;
     this->client_socket = socket;
-    this->client_address = client_address;
-    this->addr_len = addr_len;
 
     this->server_instance = server_instance;
     this->atmc_ack_received_message = 0;
@@ -100,7 +100,10 @@ void connected_client::t_handle() {
                     } else if(received_message.substr(0,8).compare("/unmute ") == 0) { 
                         // TODO: unmute command.
                     } else if(received_message.substr(0,7).compare("/whois ") == 0) { 
-                        // TODO: whois command.
+
+                        // Tries printing the ip of a certain client.
+                        this->whois_client(received_message.substr(7,received_message.length()));
+
                     }
                 }
                 
@@ -261,6 +264,36 @@ int connected_client::l_get_role() {
 
 }
 
+// Returns the ip of this client as a string (gets a lock).
+std::string connected_client::l_get_ip() {
+
+    if(this->atmc_kill) // Checks if the client is still connected.
+        return nullptr;
+
+    std::string ip;
+    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    this->updating.lock();
+    // ENTER CRITICAL REGION =======================================
+
+    // Gets the ip address for the this clients socket.
+    struct sockaddr_in sa;
+    socklen_t sa_len = sizeof(sa);
+    if(!getsockname(this->client_socket, (struct sockaddr*)(&sa), &sa_len)) {
+
+        // Gets the ip.
+        char *ip_char = inet_ntoa(sa.sin_addr);
+        // Converts to std::string.
+        ip = std::string(ip_char);
+
+    }
+
+    // EXIT CRITICAL REGION ========================================
+    // Exits the critical region, and opens the semaphore.
+    this->updating.unlock();
+    return ip;
+
+}
+
 // ==============================================================================================================================================================
 // Commands =====================================================================================================================================================
 // ==============================================================================================================================================================
@@ -404,5 +437,39 @@ bool connected_client::join_channel(std::string channel_name) {
     }
 
     return success;
+
+}
+
+// Prints the IP of a client to the admin.
+bool connected_client::whois_client(std::string client_name) {
+
+    // Gets the target client.
+    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
+
+    // If the client wasn't found returns.
+    if(target_client == nullptr) {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
+        worker.detach();
+        return false;
+    }
+
+    // Checks if the this client and the target are on the same channel.
+    if(target_client->l_get_channel() == this->l_get_channel()) {
+
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the ip for " + client_name + " is " + target_client->l_get_ip() + "."));
+        worker.detach();
+
+        return true;
+
+    } else {
+        // Sends a message with the results.
+        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
+        worker.detach();
+        return false;
+    }
+
+    
 
 }

@@ -34,7 +34,7 @@ class connected_client
     public:
 
         // CONSTRUCTOR
-        connected_client(int socket, struct sockaddr client_address, socklen_t addr_len, server *server_instance);
+        connected_client(int socket, server *server_instance);
 
         // Used to lock this client for updates.
         std::mutex updating;
@@ -49,9 +49,6 @@ class connected_client
 
         // This client's socket.
         int client_socket;
-        // This client's address.
-        struct sockaddr client_address;
-        socklen_t addr_len;
 
         // Stores the value to check if messages where received and acknowledged.
         std::atomic_int32_t atmc_ack_received_message;
@@ -75,6 +72,8 @@ class connected_client
         int l_get_channel();
         // Returns the role of this client on it's channel (gets a lock).
         int l_get_role();
+        // Returns the ip of this client as a string (gets a lock).
+        std::string l_get_ip();
 
         // Commands =============================================================
 
@@ -86,6 +85,9 @@ class connected_client
 
         // Tries joining a server channel.
         bool join_channel(std::string channel_name);
+
+        // Prints the IP of a client to the admin.
+        bool whois_client(std::string client_name);
 
     private:
 
