@@ -16,10 +16,13 @@
 # include <mutex>
 # include <thread>
 
+# include <chrono>
+
 # include <sys/types.h>
 # include <sys/socket.h>
 
-#include <arpa/inet.h>
+# include <arpa/inet.h>
+# include <netinet/in.h>
 
 #include <unistd.h>
 
@@ -142,37 +145,50 @@ void connected_client::t_redirect_message_worker(std::string *message) {
     if(this->atmc_kill) // Checks if the client is still connected.
         return;
 
-    // Marks that this clients needs to acknowledges that a message has being received.
-    this->atmc_ack_received_message++;
-
     // Marks how many attempts are left for a client to receive and acknowledge this message.
     int attempts = MAX_RESENDING_ATTEMPS;
 
+    // Marks that this clients needs to acknowledges that a message has being received.
+    this->atmc_ack_received_message++;
+
+    // Used to measure time, when verifying if the message arrived and was acknowledged.
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
+    std::chrono::time_point<std::chrono::steady_clock> current_time;
+    std::chrono::duration<double> diff;
+
     // Attempt sending the message.
-    int success = 0;
+    bool success = false;
     while (attempts > 0) {
 
         if(this->atmc_kill) // Checks if the client is still connected.
             break;
 
-        // Sends the message.
-        send_message(this->client_socket, *message);
+        // Gets the current time.
+        current_time = std::chrono::steady_clock::now();
+        // Calculates the time difference.
+        diff = current_time - start_time;
 
-        // Sleeps the thread for the desired time to wait for a response.
-        usleep(ACKNOWLEDGE_WAIT_TIME);
+        // Checks if it's time to ressend the message or if it's the first attempt..
+        if(diff.count() > ACKNOWLEDGE_WAIT_TIME || attempts == MAX_RESENDING_ATTEMPS) {
+
+            if(attempts < MAX_RESENDING_ATTEMPS) // If the message failed to be sent and this is a retry prints a message.
+                std::cerr << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << std::endl;
+
+            // Gets the start time for this attempt..
+            start_time = std::chrono::steady_clock::now();
+
+            // Attempt to send the message.
+            send_message(this->client_socket, *message);
+            attempts--;
+        }
 
         // Marks that all messages were successfully sent.
         if(this->atmc_ack_received_message < 1)
-            success = 1;
+            success = true;
 
         // Breaks when the message was successfully sent.
         if(success)
             break;
-
-        // If the message failed to be sent, decreases the number of attemps remaining.
-        attempts--;
-        std::cerr << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << std::endl;
-
     }
 
     // Frees the message memory.
@@ -180,7 +196,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
 
     // If the client could not confirm the message was received, shut it down.
     if(!success && !this->atmc_kill)
-        shutdown(this->client_socket, 2);
+        shutdown(this->client_socket, SHUT_RDWR);
     
 }
 
@@ -391,7 +407,7 @@ bool connected_client::join_channel(std::string channel_name) {
     // Searches for the target channel.
     channel *target_channel = nullptr;
     for(auto it = this->server_instance->channels.begin(); it != this->server_instance->channels.end(); it++) {
-        if((*it)->name.compare('#' + channel_name) == 0) {
+        if((*it)->name.compare(channel_name) == 0) {
             target_channel = *it;
             break;
         }
@@ -426,6 +442,10 @@ bool connected_client::join_channel(std::string channel_name) {
 
         // Tries changing the channel.
         success = target_channel->add_client(this);
+
+        // Sends a message to disable showing the admin commands.
+        std::thread worker_enable_commands(&connected_client::t_redirect_message_worker, this, new std::string("/hide_admin_commands"));
+        worker_enable_commands.detach();
 
         // Sends a message with the results.
         std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel " + channel_name + "!"));

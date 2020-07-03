@@ -9,6 +9,8 @@
 # include <vector>
 # include <thread>
 # include <mutex>
+
+# include <arpa/inet.h>
 # include <netinet/in.h>
 
 # include "channel.hpp"

@@ -17,7 +17,7 @@
 
 # define MAX_NICKNAME_SIZE 50 // Max size of a connect client's nickname.
 # define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message to a connected client.
-# define ACKNOWLEDGE_WAIT_TIME 400 // Amount of time the server will wait before an attempt to send a message toa connected client fails.
+# define ACKNOWLEDGE_WAIT_TIME 0.400 // Amount of time the server will wait before an attempt to send a message to a connected client fails (in seconds).
 
 # define CLIENT_DEAD -2 // Client is marked to be "killed".
 # define CLIENT_NO_CHANNEL -1 // Client has no channel.

@@ -21,7 +21,6 @@
 # include <sys/types.h>
 # include <sys/socket.h>
 
-# include <arpa/inet.h>
 # include <netinet/in.h>
 
 #include <unistd.h>
@@ -197,9 +196,6 @@ void server::remove_client(connected_client *connection) {
     // Exits the critical region, and opens the semaphore.
     this->updating_connections.unlock();
 
-    // Ensures that any thread trying to check if a message was successfully sent has ended.
-    usleep(2 * ACKNOWLEDGE_WAIT_TIME);
-
     std::cerr << "Client with socket " << connection->client_socket << " disconnected!" << std::endl;
     
     // Deletes the current connection.
@@ -255,6 +251,7 @@ bool server::create_channel(std::string name, connected_client *admin) {
 
 }
 
+// !FIXME: Segmentation fault.
 // TODO: Improve thread safety, currently this function is locked all the times it's called so locking again will cause a deadlock, but it would be better to lock inside the function.
 // Deletes a new channel on this server.
 bool server::delete_channel(int index) {

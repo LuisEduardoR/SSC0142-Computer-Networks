@@ -174,6 +174,30 @@ void client::handle() {
             continue;
         }
 
+        // Prints a message for the /kick command
+        if(command_buffer.substr(0,6).compare("/kick ") == 0) {
+            std::cout << std::endl << "Kick attempt sent to server... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /mute command
+        if(command_buffer.substr(0,6).compare("/mute ") == 0) {
+            std::cout << std::endl << "Mute attempt sent to server... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /unmute command
+        if(command_buffer.substr(0,8).compare("/unmute ") == 0) {
+            std::cout << std::endl << "Unmute attempt sent to server... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
+        // Prints a message for the /whois command
+        if(command_buffer.substr(0,7).compare("/whois ") == 0) {
+            std::cout << std::endl << "Whois sent to server... Use /new to check for the server response!" << std::endl;
+            continue;
+        }
+
     } while (!atmc_close_client_flag);
 
     // Joins the thead listening for messages message thread before returning.
@@ -199,11 +223,10 @@ void client::t_listen_to_server() {
 
             if(response_message.compare("/show_admin_commands") == 0) { // Client is now an admin, show admin commands.
                 this->atmc_show_admin_commands = true;
-            } else if(response_message.compare("/show_admin_commands") == 0) { // Client is no longer an admin, hide admin commands
+            } else if(response_message.compare("/hide_admin_commands") == 0) { // Client is no longer an admin, hide admin commands
                 this->atmc_show_admin_commands = false;
             } else { // Regular message, transfers to the new message list.
                 this->new_messages.push_back(response_message);
-
             }
 
 
