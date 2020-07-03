@@ -51,6 +51,9 @@ class server
         // Creates a new channel on this server.
         bool create_channel(std::string name, connected_client *admin);
 
+        // Deletes a new channel on this server.
+        bool delete_channel(int index);
+
         void remove_client(connected_client *connection);
 
 };

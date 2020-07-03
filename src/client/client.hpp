@@ -9,6 +9,7 @@
 # include <string>
 # include <vector>
 # include <mutex>
+# include <atomic>
 # include <netinet/in.h>
 
 class client
@@ -20,6 +21,9 @@ class client
 
         std::mutex updating_messages;
         std::vector<std::string> new_messages;
+
+        // If admin commands should be shown.
+        std::atomic_bool show_admin_commands;
 
         client();
         ~client();

@@ -24,7 +24,7 @@ bool channel::add_client(connected_client *client) {
     bool success = false;
 
     // Gets the old client channel.
-    int old_channel_index = client->get_channel();
+    int old_channel_index = client->l_get_channel();
 
     // If the client is already on this channel, does nothing.
     if(old_channel_index == this->index)
@@ -50,7 +50,7 @@ bool channel::add_client(connected_client *client) {
     // ENTER CRITICAL REGION =======================================
 
     // Sets the client new channel and role.
-    success = client->set_channel(this->index, CLIENT_ROLE_NORMAL);
+    success = client->l_set_channel(this->index, CLIENT_ROLE_NORMAL);
 
     // Adds client to this channel's members and removes from the old if it has changed channels successfully.
     if(success)
@@ -82,7 +82,7 @@ bool channel::remove_client(connected_client *client) {
     // ENTER CRITICAL REGION =======================================
 
     // Sets the client channel to none (note that if the client exited the channel orderly it should be sent back to the idle channel).
-    success = client->set_channel(CLIENT_NO_CHANNEL, CLIENT_NO_CHANNEL);
+    success = client->l_set_channel(CLIENT_NO_CHANNEL, CLIENT_NO_CHANNEL);
     // Adds client to the channel members if it has changed channels successfully.
     if(success) this->members.erase(client);   
     
@@ -92,15 +92,19 @@ bool channel::remove_client(connected_client *client) {
     this->updating.unlock();
 
     if(success) {
+        
         std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "! ";
         std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
+
+        // Deletes the channel if it's now empty.
+        if(this->members.size() < 1)
+            this->server_instance->delete_channel(this->index);
+
         return true;
     }
 
     std::cerr << "Error removing client with socket " << client->client_socket << " from channel " << this-> name << "! ";
     return false;
-
-    // TODO: Delete the channel if empty.
 
 }
 

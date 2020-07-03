@@ -69,7 +69,7 @@ void connected_client::t_handle() {
             } else if (received_message.substr(0,6).compare("/send ") == 0) { // Detects regular message that needs to be posted in the channel.
 
                 // Checks if the client is on a channel before sending message.
-                if(this->get_channel() < 0) {
+                if(this->l_get_channel() < 0) {
                     std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you need to join a channel before sending messages!"));
                     worker.detach();
                     continue;
@@ -137,7 +137,7 @@ void connected_client::t_handle() {
                 // If the nickname doesn't exist, tries setting it.
                 if(!nickname_exists) {
 
-                    bool success = this->set_nickname(new_nickname); // Tries updating the nickname. 
+                    bool success = this->l_set_nickname(new_nickname); // Tries updating the nickname. 
 
                     // Sends a message to the client telling the results.
                     if(success) {
@@ -174,8 +174,15 @@ void connected_client::t_handle() {
 
                     // Sends a message with the results.
                     if(success) {
-                        std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel #" + channel_name + " as an admin!"));
-                        worker.detach();
+                        
+                        // Sends a message to enable showing the admin commands.
+                        std::thread worker_enable_commands(&connected_client::t_redirect_message_worker, this, new std::string("/show_admin_commands"));
+                        worker_enable_commands.detach();
+
+                        // Sends a message with text to warn the client of the success.
+                        std::thread worker_warning(&connected_client::t_redirect_message_worker, this, new std::string("server: you're now on channel #" + channel_name + " as an admin!"));
+                        worker_warning.detach();
+
                     } else {
                         std::thread worker(&connected_client::t_redirect_message_worker, this, new std::string("server: the channel #" + channel_name + "doesn't exist and can't be created! (Invalid name)"));
                         worker.detach();
@@ -191,6 +198,10 @@ void connected_client::t_handle() {
                     worker.detach();
 
                 }
+            } else if(this->l_get_role() == CLIENT_ROLE_ADMIN) { // Checks for the admin commands, if the client is an admin.
+
+                // TODO: admin commands.
+
             }
 
         } else if(status == 1) { // No new messages from this client.
@@ -274,7 +285,7 @@ void connected_client::t_redirect_message_worker(std::string *message) {
 }
 
 // Tries updating the player nickname.
-bool connected_client::set_nickname(std::string nickname) {
+bool connected_client::l_set_nickname(std::string nickname) {
 
     if(this->kill) // Checks if the client is still connected.
         return false;
@@ -306,7 +317,7 @@ bool connected_client::set_nickname(std::string nickname) {
 }
 
 // Changes the channel this client is connected to.
-bool connected_client::set_channel(int channel, int role) {
+bool connected_client::l_set_channel(int channel, int role) {
 
     if(this->kill) // Checks if the client is still connected.
         return false;
@@ -324,7 +335,7 @@ bool connected_client::set_channel(int channel, int role) {
 }
 
 // Returns the channel this client is conencted to.
-int connected_client::get_channel() {
+int connected_client::l_get_channel() {
 
     if(this->kill) // Checks if the client is still connected.
         return CLIENT_DEAD;
@@ -342,7 +353,7 @@ int connected_client::get_channel() {
 }
 
 // Returns the role of this client on it's channel.
-int connected_client::get_role() {
+int connected_client::l_get_role() {
 
     if(this->kill) // Checks if the client is still connected.
         return CLIENT_DEAD;

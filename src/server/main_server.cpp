@@ -156,7 +156,7 @@ void server::t_check_for_connections() {
 void server::remove_client(connected_client *connection) {
 
     // Removes the client from it's channel.
-    int client_channel = connection->get_channel();
+    int client_channel = connection->l_get_channel();
     if(client_channel >= 0)
         connection->server_instance->channels[client_channel]->remove_client(connection);
 
@@ -202,7 +202,7 @@ bool server::create_channel(std::string name, connected_client *admin) {
     this->updating_channels.lock();
 
     // ENTER CRITICAL REGION =======================================
-    int channel_index = admin->get_channel();
+    int channel_index = admin->l_get_channel();
 
     // Removes the client from the old channel if there is one.
     if(channel_index >= 0)
@@ -213,7 +213,7 @@ bool server::create_channel(std::string name, connected_client *admin) {
 
     // Adds the admin to the channel.
     new_channel->members.insert(admin);
-    admin->set_channel(new_channel->index, CLIENT_ROLE_ADMIN);
+    admin->l_set_channel(new_channel->index, CLIENT_ROLE_ADMIN);
 
     // Creates the new channel and adds it to the list.
     this->channels.push_back(new_channel);
@@ -225,6 +225,21 @@ bool server::create_channel(std::string name, connected_client *admin) {
 
     // Exits the critical region, and opens the semaphore.
     this->updating_channels.unlock();
+
+    return true;
+
+}
+
+// TODO: Improve thread safety, currently this function is locked all the times it's called so locking again will cause a deadlock, but it would be better to lock inside the function.
+// Deletes a new channel on this server.
+bool server::delete_channel(int index) {
+
+    // TODO: currently there's no need to remove users from the channel, as the channel will only be removed when empty, but this should be done here.
+    // Removes the channel.
+    std::string name = this->channels[index]->name; // Gets the name to the log message.
+    this->channels.erase(this->channels.begin() + index);
+
+    std::cerr << "Channel " << name << " deleted!" << std::endl;
 
     return true;
 

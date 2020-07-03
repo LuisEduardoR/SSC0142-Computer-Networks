@@ -44,6 +44,9 @@ client::client() {
     // Creates a TCP socket.
     this->network_socket = socket(AF_INET, SOCK_STREAM, 0);
 
+    // Doesn't show admin commands at start.
+    this->show_admin_commands = false;
+
     // Initializes the client new messages as empty.
     this->new_messages.clear();
 
@@ -111,6 +114,15 @@ void client::handle() {
         std::cout << "\t/send\t\t<MESSAGE>\t- Send a message" << std::endl;
         std::cout << "\t/ping\t\t\t\t- The server answers \"pong\"" << std::endl;
         std::cout << "\t/quit\t\t\t\t- Close the connection and exit the program" << std::endl << std::endl;
+
+        // Prints admin commands if necessary.
+        if(show_admin_commands) {
+            std::cout << "\tAdmin:" << std::endl;
+            std::cout << "\t/mute\t\t<NICKNAME>\t- Mutes an user on the current channel" << std::endl;
+            std::cout << "\t/unmute\t\t<NICKNAME>\t- Un-mutes an user on the current channel" << std::endl;
+            std::cout << "\t/kick\t\t<NICKNAME>\t- Kicks an user from the server" << std::endl;
+            std::cout << "\t/whois\t\t<NICKNAME>\t- Prints the IP of an user" << std::endl << std::endl;
+        }
 
         // Receives commands.
         std::getline(std::cin, command_buffer);
@@ -185,8 +197,15 @@ void client::t_listen_to_server() {
             // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
             this->updating_messages.lock();
 
-            // Transfers the response buffer to the new message list.
-            this->new_messages.push_back(response_message);
+            if(response_message.compare("/show_admin_commands") == 0) { // Client is now an admin, show admin commands.
+                this->show_admin_commands = true;
+            } else if(response_message.compare("/show_admin_commands") == 0) { // Client is no longer an admin, hide admin commands
+                this->show_admin_commands = false;
+            } else { // Regular message, transfers to the new message list.
+                this->new_messages.push_back(response_message);
+
+            }
+
 
             // EXIT CRITICAL REGION ========================================
 

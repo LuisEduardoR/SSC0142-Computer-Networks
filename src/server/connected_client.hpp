@@ -58,21 +58,21 @@ class connected_client
         // Stores the value to check if messages where received and acknowledged.
         int ack_received_message;
 
-        // Thread that handles the client connection to the server.
+        // Thread that handles the client connection to the server (used as a thread).
         void t_handle();
 
-        // Used as a worker thread to redirect messages to a client and check if the client received the message.
+        // Used as a worker thread to redirect messages to a client and check if the client received the message (used as a thread).
         void t_redirect_message_worker(std::string *message);
 
-        // Tries updating the player nickname.
-        bool set_nickname(std::string nickname);
+        // Tries updating the player nickname (gets a lock).
+        bool l_set_nickname(std::string nickname);
 
-        // Changes the channel this client is connected to.
-        bool set_channel(int channel, int role);
-        // Returns the channel this client is conencted to.
-        int get_channel();
-        // Returns the role of this client on it's channel.
-        int get_role();
+        // Changes the channel this client is connected to (gets a lock).
+        bool l_set_channel(int channel, int role);
+        // Returns the channel this client is conencted to (gets a lock).
+        int l_get_channel();
+        // Returns the role of this client on it's channel (gets a lock).
+        int l_get_role();
 
     private:
 
