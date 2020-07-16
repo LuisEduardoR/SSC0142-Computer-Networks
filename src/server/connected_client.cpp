@@ -277,8 +277,19 @@ bool connected_client::set_nickname(std::string nickname) {
 
 /* Changes the channel this client is connected to. */
 void connected_client::set_channel(std::string &channel_name, int role) {
+
     this->current_channel = channel_name;
     this->channel_role = role;    
+
+    // Sends a message to the client to enable or disable the admin commands.
+    if(role == CLIENT_ROLE_ADMIN) { // Activates showing admin commands.
+        std::string admin_on_msg = "/show_admin_commands";
+        this->send(admin_on_msg);
+    } else {
+        std::string admin_on_msg = "/hide_admin_commands";
+        this->send(admin_on_msg); // Deactivates showing admin commands.
+    }
+
 }
 
 /* Returns the channel this client is connected to. */

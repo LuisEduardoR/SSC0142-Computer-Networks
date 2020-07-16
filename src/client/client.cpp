@@ -119,9 +119,9 @@ void client::handle() {
         // Prints admin commands if necessary.
         if(atmc_show_admin_commands) {
             std::cout << "\tAdmin:" << std::endl;
+            std::cout << "\t/kick\t\t<NICKNAME>\t- Kicks an user from the server" << std::endl;
             std::cout << "\t/mute\t\t<NICKNAME>\t- Mutes an user on the current channel" << std::endl;
             std::cout << "\t/unmute\t\t<NICKNAME>\t- Un-mutes an user on the current channel" << std::endl;
-            std::cout << "\t/kick\t\t<NICKNAME>\t- Kicks an user from the server" << std::endl;
             std::cout << "\t/whois\t\t<NICKNAME>\t- Prints the IP of an user" << std::endl << std::endl;
         }
 
@@ -155,7 +155,7 @@ void client::handle() {
         send_message(this->network_socket, command_buffer);
 
         // Prints a message saying that the command was sent to server.
-        std::cout << std::endl << "Command sent to server..." << std::endl;
+        std::cout << std::endl << "Command sent to server... Use /new to check for results!" << std::endl;
 
     } while (!atmc_close_client_flag);
 

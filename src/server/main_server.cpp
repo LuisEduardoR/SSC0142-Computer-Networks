@@ -220,7 +220,7 @@ void server::handle() {
         }
 
         if(admin_failed) { // Sends a warning to the client that a request failed because it's not an admin.
-            std::string error_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + "you must be an admin to do that!";
+            std::string error_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you must be an admin to do that!";
             origin->send(error_msg);
         }
         
@@ -676,9 +676,26 @@ void server::join_request(connected_client *origin, std::string &channel_name) {
 
 /* Tries kicking a client that must be in the same channel. */
 void server::kick_request(connected_client *origin, std::string &nickname) {
-    // TODO: kick request only for admins.
-    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /kick request not available...");
-    origin->send(error_msg);
+
+    // Gets a reference to the target client that will be kicked.
+    connected_client *target = this->get_client_ref(nickname);
+
+    // ? Shoudn't we only be able to kick clients in the same channel we are the admin???
+
+    // Checks if the target client exists and sends an error message if it does not.
+    if(target == nullptr) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Shutdowns the target client connection.
+    shutdown(target->get_socket(), SHUT_RDWR);
+
+    // Sends a message telling the admin that the client was kicked.
+    std::string kick_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" kicked!");
+    origin->send(kick_msg);
+
 }
 
 /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
@@ -690,9 +707,28 @@ void server::toggle_mute_request(connected_client *origin, std::string &nickname
 
 /* Tries finding and showing the IP of a client a player that must be in the same channel. */
 void server::whois_request(connected_client *origin, std::string &nickname) {
-    // TODO: whois request only for admins.
-    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /whois request not available...");
-    origin->send(error_msg);
+    
+    // Gets a reference to the target client that will have it's ip sent.
+    connected_client *target = this->get_client_ref(nickname);
+
+    // Checks if the target client exists and sends an error message if it does not.
+    if(target == nullptr) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Ensures admin and client are in the same channel, sends an error message if they are not.
+    if(origin->get_channel().compare(target->get_channel()) != 0) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Sends a message telling the admin the IP of the target.
+    std::string kick_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " the IP address of \"" + nickname + "\" is " + target->get_ip() + "!");
+    origin->send(kick_msg);
+
 }
 
 // ==============================================================================================================================================================
