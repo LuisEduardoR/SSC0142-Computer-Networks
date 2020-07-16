@@ -3,11 +3,15 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
+# include "../color.hpp"
+
 # include "client.hpp"
 # include "../messaging/messaging.hpp"
 
 # include <iostream>
 # include <string>
+
+# include <queue>
 
 # include <mutex>
 # include <thread>
@@ -33,7 +37,7 @@ std::atomic_bool atmc_close_client_flag(false);
 void ignore_sigint(int signal_num) {
 
     // Prints a message and resets the signal.
-    std::cout <<  std::endl << "Use the /quit command or input EOF (CTRL+D) to exit!" << std::endl;
+    std::cout <<  std::endl << COLOR_BOLD_CYAN << "<Use the /quit command or input EOF (CTRL+D) to exit!>" << COLOR_DEFAULT << std::endl;
     std::signal(SIGINT, ignore_sigint);
 
 }
@@ -46,9 +50,6 @@ client::client() {
 
     // Doesn't show admin commands at start.
     this->atmc_show_admin_commands = false;
-
-    // Initializes the client new messages as empty.
-    this->new_messages.clear();
 
 }
 
@@ -97,7 +98,7 @@ void client::handle() {
     // Sends the nickname to the server.
     command_buffer = "/nickname " + command_buffer;
     send_message(this->network_socket, command_buffer);
-    std::cout << std::endl << "Nickname sent to server... Use /new to check for the server response! If your nickname is invalid you will be given a default nickname that can be changed later!" << std::endl;
+    std::cout << std::endl << COLOR_BOLD_YELLOW << "Nickname sent to server... Use /new to check for the server response! If your nickname is invalid you will be given a default nickname that can be changed later!" << COLOR_DEFAULT << std::endl;
 
     do {
 
@@ -127,17 +128,15 @@ void client::handle() {
         // Receives commands.
         std::getline(std::cin, command_buffer);
 
+        // Checks and ignores empty string.
+        if(command_buffer.empty())
+            continue;
+
         // Checks for the /new command.
         if(command_buffer.compare("/new") == 0) {
 
             std::cout << std::endl << "Checking for new messages..." << std::endl << std::endl;
-            // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
-            this->updating_messages.lock(); // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            // ENTER CRITICAL REGION ============================================================================================================================
             show_new_messages();
-            // EXIT CRITICAL REGION =============================================================================================================================
-            this->updating_messages.unlock(); // Exits the critical region, and opens the semaphore.
-            // --------------------------------------------------------------------------------------------------------------------------------------------------
             continue;
 
         }
@@ -176,25 +175,21 @@ void client::t_listen_to_server() {
 
         if(status == 0) {
 
-            // Handles showing the new messages in a thread safe way. ------------------------------------------------------------------------------------------V
+            // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
+            this->updating_messages.lock(); // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+            // ENTER CRITICAL REGION ============================================================================================================================
 
-            // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            this->updating_messages.lock();
-
+            // Checks if the message is a special command or a regular message.
             if(response_message.compare("/show_admin_commands") == 0) { // Client is now an admin, show admin commands.
                 this->atmc_show_admin_commands = true;
             } else if(response_message.compare("/hide_admin_commands") == 0) { // Client is no longer an admin, hide admin commands
                 this->atmc_show_admin_commands = false;
             } else { // Regular message, transfers to the new message list.
-                this->new_messages.push_back(response_message);
+                this->new_messages.push(response_message);
             }
 
-
-            // EXIT CRITICAL REGION ========================================
-
-            // Exits the critical region, and opens the semaphore.
-            this->updating_messages.unlock();
-
+            // EXIT CRITICAL REGION =============================================================================================================================
+            this->updating_messages.unlock(); // Exits the critical region, and opens the semaphore.
             // --------------------------------------------------------------------------------------------------------------------------------------------------
 
         } else if (status == 1) { // No new messages.
@@ -209,20 +204,22 @@ void client::t_listen_to_server() {
 // Shows client new messages.
 void client::show_new_messages() {
 
-    if(this->new_messages.size() == 0)
+    // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
+    this->updating_messages.lock(); // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
+    // ENTER CRITICAL REGION ============================================================================================================================
+    if(this->new_messages.empty()) { // Prints a messager telling if no new messages arrived.
         std::cout << "No new messages available!" << std::endl;
-    else {
-
+    } else { // If there are new messages shows all of them.
         std::cout << "You have new messages:" << std::endl << std::endl;
-
-        // Prints the messages.
-        for(size_t i = 0; i < this->new_messages.size(); i++)
-            std::cout << "- " << this->new_messages[i] << std::endl;
-
-        // Empties the new message array.
-        this->new_messages.clear();
-
+        while(!this->new_messages.empty()) {
+            // Prints the message.
+            std::cout << "- " << this->new_messages.front() << std::endl;
+            this->new_messages.pop(); // Removes the message from the queue.
+        }
     }
+    // EXIT CRITICAL REGION =============================================================================================================================
+    this->updating_messages.unlock(); // Exits the critical region, and opens the semaphore.
+    // --------------------------------------------------------------------------------------------------------------------------------------------------
 
 }
 

@@ -3,6 +3,8 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
+# include "color.hpp"
+
 # include "client/client.hpp"
 # include "server/main_server.hpp"
 # include "messaging/messaging.hpp"
@@ -109,7 +111,7 @@ int main(int argc, char* argv[])
                 client *c = new client();
                 // Checks for errors creating the client.
                 if(c == nullptr) {
-                    std::cerr << "Error creating new client! (-1)" << std::endl << std::endl;
+                    std::cerr << COLOR_BOLD_RED << "Error creating new client! (-1)" << COLOR_DEFAULT << std::endl << std::endl;
                     return -1;
                 }
                 std::cout << "Client created successfully!" << std::endl;
@@ -119,17 +121,17 @@ int main(int argc, char* argv[])
                 int cnct_status = c->connect_to_server(server_addr.c_str(), server_port);
                 // Checks for errors.
                 if(cnct_status < 0) {
-                    std::cerr << "Error connecting to remote socket! (" << cnct_status << ")" << std::endl << std::endl;
+                    std::cerr << COLOR_BOLD_RED << "Error connecting to remote socket! (" << cnct_status << ")" << COLOR_DEFAULT << std::endl << std::endl;
                     delete c;
                     return cnct_status;
                 }
-                std::cout << "Connected to the server successfully!" << std::endl;
+                std::cout << COLOR_BOLD_GREEN << "Connected to the server successfully!" << COLOR_DEFAULT << std::endl;
 
                 // Handles the client execution until it's disconnected.
                 c->handle();
 
                 // Deletes the client.
-                std::cout << std::endl << "Disconnected from the server!" << std::endl << std::endl;
+                std::cout << std::endl << COLOR_BOLD_RED << "Disconnected from the server!" << COLOR_DEFAULT << std::endl << std::endl;
                 delete c;
 
                 // Exits the program.
@@ -161,29 +163,29 @@ int main(int argc, char* argv[])
         server *s = new server(server_port);
         // Checks for errors creating the server.
         if(s == nullptr) {
-            std::cerr << "Error creating server! (-1)" << std::endl << std::endl;
+            std::cerr << COLOR_BOLD_RED << "Error creating server! (-1)" << COLOR_DEFAULT << std::endl << std::endl;
             return -1;
         }
         
         // Checks for errors. 
         int svr_status = s->get_status();
         if(svr_status < 0) {
-            std::cerr << "Error connecting to socket! (" << svr_status << ")" << std::endl << std::endl;
+            std::cerr << COLOR_BOLD_RED << "Error connecting to socket! (" << COLOR_DEFAULT << svr_status << ")" << std::endl << std::endl;
             delete s;
             return svr_status;
         }
-        std::cout << "Server created successfully!" << std::endl << std::endl;
+        std::cout << COLOR_BOLD_GREEN << "Server created successfully!" << COLOR_DEFAULT << std::endl << std::endl;
 
         // Handles the server execution.
-        std::cout << "Running... (Press CTRL+C to stop)" << std::endl << std::endl;
+        std::cout << "Running... " << COLOR_BOLD_CYAN << "<Press CTRL+C to stop>" << COLOR_DEFAULT << std::endl << std::endl;
         s->handle();
 
         // Deletes the server after it's done.
-        std::cout << std::endl << "Server closed!" << std::endl << std::endl;;
+        std::cout << COLOR_BOLD_YELLOW << std::endl << "Server closed!" << COLOR_DEFAULT << std::endl << std::endl;;
         delete s;
 
     } else // Don't do anything for other parameters.
-        std::cout << std::endl << "Invalid parameter!" << std::endl << std::endl;
+        std::cout << std::endl << COLOR_BOLD_RED << "Invalid parameter!" << COLOR_DEFAULT << std::endl << std::endl;
 
     return 0;
 

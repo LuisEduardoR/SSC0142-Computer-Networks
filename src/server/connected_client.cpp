@@ -3,6 +3,8 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
+# include "../color.hpp"
+
 # include "main_server.hpp"
 # include "connected_client.hpp"
 # include "../messaging/messaging.hpp"
@@ -123,7 +125,7 @@ void connected_client::t_handle_listening()  {
                 if(new_message.compare(ACKNOWLEDGE_MESSAGE) == 0) // Marks that the client has acknowledge a message (done here to avoid delays on the queue).       
                     this->atmc_ack_received_message--;
                 else if(new_message.compare("/ping") == 0) { // Sends a "pong" back to the client (done here to avoid delays on the queue).       
-                    std::string ping_msg("server: pong");
+                    std::string ping_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " pong";
                     this->send(ping_msg);
                 } else // If the request can't be handled here puts it on the request queue.
                     this->server_instance->make_request(this, new_message);
@@ -137,7 +139,7 @@ void connected_client::t_handle_listening()  {
                 break;
 
             default: // An error has happened. ===================================================================================
-                std::cerr << "ERROR " << status << "!" << std::endl;
+                std::cerr << COLOR_BOLD_RED << "ERROR " << status << "!" << COLOR_DEFAULT << std::endl;
                 break;
         }        
     }
@@ -200,7 +202,7 @@ void connected_client::t_handle_sending() {
             if(diff.count() > ACKNOWLEDGE_WAIT_TIME || attempts == MAX_RESENDING_ATTEMPS) {
 
                 if(attempts < MAX_RESENDING_ATTEMPS) // If the message failed to be sent and this is a retry prints a message.
-                    std::cerr << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << std::endl;
+                    std::cerr << COLOR_BOLD_YELLOW << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << COLOR_DEFAULT << std::endl;
 
                 // Attempt to send the message.
                 send_message(this->client_socket, current_message);

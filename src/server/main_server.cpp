@@ -3,6 +3,8 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
+# include "../color.hpp"
+
 # include "main_server.hpp"
 # include "channel.hpp"
 # include "request.hpp"
@@ -160,7 +162,7 @@ void server::handle() {
         // Gets the client that sent this request.
         connected_client *origin = this->get_client_ref(current_request.get_origin_socket());
         if(origin == nullptr) { // Checks if the client who sent the request is still avaliable.
-            std::cerr << "Request cancelled! (Client with socket " << current_request.get_origin_socket() << " is no longer avaliable)";
+            std::cerr << COLOR_YELLOW << "Request cancelled! (Client with socket " << current_request.get_origin_socket() << COLOR_YELLOW << " is no longer avaliable)";
             continue;
         }
 
@@ -216,7 +218,7 @@ void server::handle() {
         }
 
         if(admin_failed) { // Sends a warning to the client that a request failed because it's not an admin.
-            std::string error_msg("server: you must be an admin to do that!");
+            std::string error_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + "you must be an admin to do that!";
             origin->send(error_msg);
         }
         
@@ -251,7 +253,7 @@ void server::t_handle_connections() {
                 continue;
 
             // Other types of errors.
-            std::cerr << "Unidentified connection error!" << std::endl;
+            std::cerr << COLOR_RED << "Unidentified connection error!" << COLOR_DEFAULT << std::endl;
             continue;
             
         }
@@ -260,7 +262,7 @@ void server::t_handle_connections() {
         connected_client *new_connection = new connected_client(new_client_socket, this);
 
         if(new_connection == nullptr) { // Checks for errors creating the connection.
-            std::cerr << "Error creating new connection!" << std::endl;
+            std::cerr << COLOR_RED << "Error creating new connection!" << COLOR_DEFAULT << std::endl;
             continue;
         }
 
@@ -289,7 +291,7 @@ void server::check_connections() {
     auto iter = this->clients.begin();
     while (iter != this->clients.end()) {
         if((*iter)->atmc_kill) { // Checks if the client has disconnected and needs to be killed.
-             std::cerr << "Client with socket " << (*iter)->get_socket() << " disconnected!" << std::endl;
+             std::cerr << COLOR_YELLOW << "Client with socket " << (*iter)->get_socket() << " disconnected!" << COLOR_DEFAULT << std::endl;
             // Kills the client.
             kill_client(*iter);
             // Removes the client from the list.
@@ -471,7 +473,7 @@ void server::make_request(connected_client *origin, std::string content) {
 
         // If the request type is invalid sends a warning back to the client and ignores it.
         if(r_type == rt_Invalid) {
-            std::string error_msg("server: invalid command or command parameters!");
+            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " invalid command or command parameters!");
             origin->send(error_msg);
             return;
         }
@@ -516,7 +518,7 @@ void server::send_request(connected_client *origin, std::string &message) {
 
     // If the client is not on a valid channel sends an error message.
     if(target_channel_index < 0) {
-        std::string error_msg("server: you need to join a channel before sending messages!");
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before sending messages!" + COLOR_DEFAULT);
         origin->send(error_msg);
         return;
     }
@@ -551,7 +553,7 @@ void server::send_request(connected_client *origin, std::string &message) {
         delete[] message_targets;
 
     } else { // Sends a message warning the client that it is muted.
-        std::string error_msg("server: you are currently muted on the channel!");
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel!" + COLOR_DEFAULT);
         origin->send(error_msg);
         return;
     }
@@ -564,17 +566,17 @@ void server::nickname_request(connected_client *origin, std::string &nickname) {
     // Checks if the nickname doesn't exist on the server.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     if(this->get_client_ref(nickname) != nullptr) {
-        std::string error_msg("server: this nickname already exists!");
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname already exists!" + COLOR_DEFAULT);
         origin->send(error_msg);
         return;
     }
 
     // Tries updating the nickname and sends a message to the client telling the results.
     if(origin->set_nickname(nickname)) {
-        std::string error_msg("server: your nickname was changed to " + nickname + "!");
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " your nickname was changed to " + nickname + "!");
         origin->send(error_msg);
     } else {
-        std::string error_msg("server: this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)");
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
         origin->send(error_msg);
     }
 
@@ -583,28 +585,28 @@ void server::nickname_request(connected_client *origin, std::string &nickname) {
 /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
 void server::join_request(connected_client *origin, std::string &channel_name) {
     // TODO: join request.
-    std::string error_msg("server: /join request not available...");
+    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /join request not available...");
     origin->send(error_msg);
 }
 
 /* Tries kicking a client that must be in the same channel. */
 void server::kick_request(connected_client *origin, std::string &nickname) {
     // TODO: kick request only for admins.
-    std::string error_msg("server: /kick request not available...");
+    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /kick request not available...");
     origin->send(error_msg);
 }
 
 /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
 void server::toggle_mute_request(connected_client *origin, std::string &nickname, bool muted) {
     // TODO: mute/unmute request only for admins.
-    std::string error_msg("server: /mute/unmute request not available...");
+    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /mute/unmute request not available...");
     origin->send(error_msg);
 }
 
 /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
 void server::whois_request(connected_client *origin, std::string &nickname) {
     // TODO: whois request only for admins.
-    std::string error_msg("server: /whois request not available...");
+    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /whois request not available...");
     origin->send(error_msg);
 }
 

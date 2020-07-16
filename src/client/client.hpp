@@ -7,9 +7,12 @@
 # define CLIENT_H
 
 # include <string>
-# include <vector>
+
+# include <queue>
+
 # include <mutex>
 # include <atomic>
+
 # include <netinet/in.h>
 
 class client
@@ -20,7 +23,7 @@ class client
         int network_socket;
 
         std::mutex updating_messages;
-        std::vector<std::string> new_messages;
+        std::queue<std::string> new_messages;
 
         // If admin commands should be shown.
         std::atomic_bool atmc_show_admin_commands;
