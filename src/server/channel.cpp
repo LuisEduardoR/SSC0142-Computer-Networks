@@ -17,13 +17,8 @@
 // Constructors/destructors =====================================================================================================================================
 // ==============================================================================================================================================================
 
-// Creates a channel with an index and a name, also passes an instance of the server.
-channel::channel(std::string name, server *server_instance) {
-
-    this->name = name;
-    this->server_instance = server_instance;
-
-}
+/* Creates a channel with a certain name. */
+channel::channel(std::string name) { this->name = name; }
 
 // ==============================================================================================================================================================
 // Statics ======================================================================================================================================================
@@ -41,8 +36,8 @@ bool channel::is_valid_channel_name(std::string &channel_name) {
         return false;
 
     // Checks for invalid characters on the whole channel name.
-    for(auto it = channel_name.begin(); it != channel_name.end(); it++) { 
-        if(*it == ' ' || *it == 7 || *it == ',')
+    for(auto iter = channel_name.begin(); iter != channel_name.end(); iter++) { 
+        if(*iter == ' ' || *iter == 7 || *iter == ',')
             return false;
     }
 
@@ -125,7 +120,6 @@ bool channel::toggle_mute_member(int socket, bool muted) {
 
 }
 
-
 /* Checks if a certain client is muted on the server. */
 bool channel::is_muted(int socket) { return (this->muted.find(socket) != this->muted.end()); }
 
@@ -139,28 +133,10 @@ bool channel::is_empty() { return this->members.empty(); }
 /* Checks if a certain client is the admin of the server. */
 std::string channel::get_name() { return this->name; }
 
-/* Gets an array of this channel's members sockets (it needs to be deleted later), and stores it's size on r_size 
-if passed as something other than nullptr. */
-int *channel::get_members(int *r_size) {
+/* Gets an array of this channel's members sockets. */
+std::vector<int> channel::get_members() {
 
-    // Stores the value to be returned.
-    int *members = nullptr;
-
-    // Checks if there are actually members on this channel (in theory there should be at least one: the admin).
-    if(this->members.size() > 0) {
-        // Allocates enough space on the array.
-        members = new int[this->members.size()];
-        // Copies the members to the array.
-        int cur_index = 0;
-        for(auto it = this->members.begin(); it != this->members.end(); it++) {
-            members[cur_index] = *it;
-            cur_index++;
-        }
-        // Stores the array size if necessary.
-        if(r_size != nullptr)
-            *r_size = this->members.size();
-    }
-
-    return members;
+    // Converts the members set to a vector and returns it.
+    return std::vector<int>(this->members.begin(), this->members.end());
 
 }

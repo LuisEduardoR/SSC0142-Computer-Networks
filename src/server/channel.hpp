@@ -6,8 +6,6 @@
 # ifndef CHANNEL_H
 # define CHANNEL_H
 
-# include "main_server.hpp"
-
 # include <string>
 
 # include <set>
@@ -31,7 +29,7 @@ class channel
         // Constructors/destructors =====================================================================================================================================
         // ==============================================================================================================================================================
         
-        channel(std::string name, server *server_instance);
+        channel(std::string name);
 
         // ==============================================================================================================================================================
         // Statics ======================================================================================================================================================
@@ -68,21 +66,14 @@ class channel
         /* Checks if a certain client is the admin of the server. */
         std::string get_name();
 
-        /* Gets an array of this channel's members sockets (it needs to be deleted later), and stores it's size on r_size 
-        if passed as something other than nullptr. */
-        int *get_members(int *r_size);
+        /* Gets an array of this channel's members sockets. */
+        std::vector<int> get_members();
 
     private:
 
         // ==============================================================================================================================================================
         // Variables=====================================================================================================================================================
         // ==============================================================================================================================================================
-
-        /* Stores an instance to the server that has this channel */
-        server *server_instance;
-
-        /* Index of the channel on the server channel list. */
-        int index;
 
         /* Name used to refer to this channel by clients. */
         std::string name;

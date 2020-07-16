@@ -53,7 +53,7 @@ class server
         // ==============================================================================================================================================================
 
         /* Makes a request to the server, that will be added to the request queue and handled as soon as possible. (gets a lock to the request_queue during execution) */
-        void make_request(connected_client *origin, std::string content);
+        void make_request(connected_client *origin, std::string &content);
 
     private:
 
@@ -77,7 +77,7 @@ class server
         std::set<connected_client*> clients;
 
         // Used to store the server's current channels.
-        std::map<std::string, channel*> channels;
+        std::map<std::string, channel> channels;
         // Used to store the name of channels that became empty and need to be removed.
         std::queue<std::string> empty_channels;
 

@@ -93,9 +93,9 @@ server::~server() {
     // --------------------------------------------------------------------------------------------------------------------------------------------------
 
     // Shutdowns and kills any remaining clients.
-    for(auto it = this->clients.begin(); it != this->clients.end(); it++) {
-        shutdown((*it)->get_socket(), SHUT_RDWR);
-        (*it)->atmc_kill = true;
+    for(auto iter = this->clients.begin(); iter != this->clients.end(); iter++) {
+        shutdown((*iter)->get_socket(), SHUT_RDWR);
+        (*iter)->atmc_kill = true;
     }
 
     // Calls check_connections to get rid of the clients.
@@ -384,10 +384,10 @@ bool server::create_channel(std::string &channel_name, int admin_socket) {
         return false;
 
     // Creates the channel.
-    channel *new_channel = new channel(channel_name, this);
+    channel new_channel(channel_name);
 
     // Adds the admin to the channel.
-    new_channel->add_member(admin_socket);
+    new_channel.add_member(admin_socket);
 
     // Creates the new channel and adds it to the map.
     this->channels.insert(std::make_pair(channel_name, new_channel));
@@ -416,11 +416,8 @@ bool server::delete_channel(std::string &channel_name) {
         return false;
     }
 
-    // Removes the channel from the map.
+    /* Erases the channel from the map. */
     this->channels.erase(channel_name);
-
-    // Deletes the channel freeing memory.
-    delete target;
 
     std::cerr << COLOR_YELLOW << "Channel " << channel_name << " deleted!" << COLOR_DEFAULT << std::endl;
 
@@ -436,9 +433,9 @@ bool server::delete_channel(std::string &channel_name) {
 connected_client *server::get_client_ref(int socket) {
 
     // Searches for the client in the list.
-    for(auto it = this->clients.begin(); it != this->clients.end(); it++)
-        if((*it)->get_socket() == socket)
-            return (*it);
+    for(auto iter = this->clients.begin(); iter != this->clients.end(); iter++)
+        if((*iter)->get_socket() == socket)
+            return (*iter);
 
     return nullptr;
 
@@ -448,9 +445,9 @@ connected_client *server::get_client_ref(int socket) {
 connected_client *server::get_client_ref(std::string &nickname) {
 
     // Searches for the client in the list.
-    for(auto it = this->clients.begin(); it != this->clients.end(); it++)
-        if((*it)->get_nickname().compare(nickname) == 0)
-            return (*it);
+    for(auto iter = this->clients.begin(); iter != this->clients.end(); iter++)
+        if((*iter)->get_nickname().compare(nickname) == 0)
+            return (*iter);
 
     return nullptr;
 
@@ -460,9 +457,9 @@ connected_client *server::get_client_ref(std::string &nickname) {
 channel *server::get_channel_ref(std::string &channel_name) {
 
     // Searches for the channel in the list.
-    auto it = channels.find(channel_name);
-    if(it != this->channels.end())
-        return (*it).second;
+    auto iter = channels.find(channel_name);
+    if(iter != this->channels.end())
+        return &(*iter).second;
 
     return nullptr;
 
@@ -473,7 +470,7 @@ channel *server::get_channel_ref(std::string &channel_name) {
 // ==============================================================================================================================================================
 
 /* Makes a request to the server, that will be added to the request queue and handled as soon as possible (gets a lock to the request_queue during execution) */
-void server::make_request(connected_client *origin, std::string content) {
+void server::make_request(connected_client *origin, std::string &content) {
 
     // Gets the origin socket to be used in execution.
     int origin_socket = origin->get_socket();
@@ -536,19 +533,19 @@ void server::make_request(connected_client *origin, std::string content) {
         this->updating_request_queue.unlock();
         // --------------------------------------------------------------------------------------------------------------------------------------------------
 
-        if(content.size() > 20)
-            std::cerr << "New request from socket " << origin_socket << ": \"" << content.substr(0, 20) << "...\"" << std::endl;
-        else
+        if(content.size() <= 20)
             std::cerr << "New request from socket " << origin_socket << ": \"" << content << "\"" << std::endl;
+        else
+            std::cerr << "New request from socket " << origin_socket << ": \"" << content.substr(0, 20) << "...\"" << std::endl;            
 
         return;
 
     }
 
-    if(content.size() > 20)
-        std::cerr << "Invalid request from socket " << origin_socket << ": \"" << content.substr(0, 20) << "...\"! Ignoring..." << std::endl;
-    else
+    if(content.size() <= 20)
         std::cerr << "Invalid request from socket " << origin_socket << ": \"" << content << "\"! Ignoring..." << std::endl;
+    else
+        std::cerr << "Invalid request from socket " << origin_socket << ": \"" << content.substr(0, 20) << "...\"! Ignoring..." << std::endl;
 
 }
 
@@ -573,21 +570,17 @@ void server::send_request(connected_client *origin, std::string &message) {
         std::string client_name = origin->get_nickname();
 
         // Gets the target sockets (channel's members).
-        int num_targets;
-        int *message_targets = target_channel->get_members(&num_targets);
+        std::vector<int> message_targets = target_channel->get_members();
 
         // Sends the message to each target.
-        for(int i = 0; i < num_targets; i++) {
+        for(auto iter = message_targets.begin(); iter != message_targets.end(); iter++) {
             // Gets the target client.
-            connected_client *target_client = this->get_client_ref(message_targets[i]);
+            connected_client *target_client = this->get_client_ref(*iter);
             if(target_client != nullptr) {
                 std::string complete_message = COLOR_BLUE + target_channel_name + COLOR_CYAN + " " + client_name + ": " + COLOR_DEFAULT + message;
                 target_client->send(complete_message);
             }
         }
-
-        // Deletes the targets array.
-        delete[] message_targets;
 
     } else { // Sends a message warning the client that it is muted.
         std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel " + target_channel_name + "!" + COLOR_DEFAULT);
@@ -655,7 +648,7 @@ void server::join_request(connected_client *origin, std::string &channel_name) {
     auto iter = this->channels.find(channel_name);
     target_channel = nullptr;
     if(iter != this->channels.end())
-        target_channel = iter->second;
+        target_channel = &(iter->second);
 
     // If the reference could be obtained the channel already exists, so adds the client.
     if(target_channel != nullptr) {

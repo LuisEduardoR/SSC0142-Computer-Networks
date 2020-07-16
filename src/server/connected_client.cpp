@@ -79,8 +79,8 @@ bool connected_client::is_valid_nickname(std::string &nickname) {
         return false;
         
     // Checks for invalid characters on the whole nickname.
-    for(auto it = nickname.begin(); it != nickname.end(); it++) { 
-        if(*it == ' ' || *it == 7 || *it == ',')
+    for(auto iter = nickname.begin(); iter != nickname.end(); iter++) { 
+        if(*iter == ' ' || *iter == 7 || *iter == ',')
             return false;
     }
 
@@ -263,7 +263,7 @@ std::string connected_client::get_nickname() {
 }
 
 /* Tries updating the player nickname. */
-bool connected_client::set_nickname(std::string nickname) {
+bool connected_client::set_nickname(std::string &nickname) {
 
     // Checks if the nickname is valid.
     if(!connected_client::is_valid_nickname(nickname))
@@ -286,8 +286,8 @@ void connected_client::set_channel(std::string &channel_name, int role) {
         std::string admin_on_msg = "/show_admin_commands";
         this->send(admin_on_msg);
     } else {
-        std::string admin_on_msg = "/hide_admin_commands";
-        this->send(admin_on_msg); // Deactivates showing admin commands.
+        std::string admin_off_msg = "/hide_admin_commands";
+        this->send(admin_off_msg); // Deactivates showing admin commands.
     }
 
 }

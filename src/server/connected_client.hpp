@@ -83,7 +83,7 @@ class connected_client
         std::string get_nickname();
 
         /* Tries updating the player nickname. */
-        bool set_nickname(std::string nickname);
+        bool set_nickname(std::string &nickname);
 
         /* Changes the channel this client is connected to. */
         void set_channel(std::string &channel_name, int role);
