@@ -9,8 +9,10 @@
 # include "connected_client.hpp"
 
 # include <set>
+# include <queue>
 
 # include <thread>
+# include <mutex>
 # include <atomic>
 
 # include <netinet/in.h>
@@ -57,20 +59,18 @@ class connected_client
         static bool is_valid_nickname(std::string &nickname);
 
         // ==============================================================================================================================================================
-        // Spawns/threads ===============================================================================================================================================
+        // Spawns =======================================================================================================================================================
         // ==============================================================================================================================================================
 
         /* Spawns the thread to handle this client's connection. */
         void spawn_handle();
 
-        /* Thread that handles the client connection to the server (used as a thread). */
-        void t_handle();
+        // ==============================================================================================================================================================
+        // Messaging ====================================================================================================================================================
+        // ==============================================================================================================================================================
 
-        /* Spawns a thread to handle sending a message to this client. */
-        void spawn_send_message_worker(std::string *message);
-
-        /* Used as a worker thread to redirect messages to a client and check if the client received the message (used as a thread). */
-        void t_send_message_worker(std::string *message);
+        /* Adds a new message to queue to be sent to this client. */
+        void send(std::string &message);
 
         // ==============================================================================================================================================================
         // Getters/setters ==============================================================================================================================================
@@ -109,14 +109,31 @@ class connected_client
         /* This client's socket. */
         int client_socket;
 
+        // Used to store messages that need to be send to this client.
+        std::queue<std::string> message_queue;
+        // Used to lock the message queue when reading or writing to it.
+        std::mutex updating_message_queue;
+
         /* Nickname for this connected client. */
         std::string nickname;
 
         /* Current channel for this client and his respective role. */
         int current_channel, channel_role;
 
-        /* Stores the thread that handles this connection. */
-        std::thread handle;
+        /* Stores the thread that handles listening for this clients conenction. */
+        std::thread listening_handle;
+        /* Stores the thread that handles seninding messages to this client. */
+        std::thread sending_handle;
+
+        // ==============================================================================================================================================================
+        // Threads ======================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Thread that handles listening for client connection. */
+        void t_handle_listening();
+
+        /* Thread that handles sending messages to the client. */
+        void t_handle_sending();
 
 };
 

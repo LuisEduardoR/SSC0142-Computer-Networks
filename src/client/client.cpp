@@ -127,7 +127,8 @@ void client::handle() {
         // Receives commands.
         std::getline(std::cin, command_buffer);
 
-        if(command_buffer.substr(0,4).compare("/new") == 0 && command_buffer.length() == std::string("/new").length()) {
+        // Checks for the /new command.
+        if(command_buffer.compare("/new") == 0) {
 
             std::cout << std::endl << "Checking for new messages..." << std::endl << std::endl;
             // Handles showing the new messages in a thread safe way. -------------------------------------------------------------------------------------------
@@ -141,11 +142,15 @@ void client::handle() {
 
         }
 
-        // Checks for the quit command.
-        if(command_buffer.substr(0,5).compare("/quit") == 0 && command_buffer.length() == std::string("/quit").length()) {
+        // Checks for the /quit command.
+        if(command_buffer.compare("/quit") == 0) {
             atmc_close_client_flag = true;
             continue;
         }
+
+        // Checks for the /ack command and ignores it, as it can't be sent directly by the user.
+        if(command_buffer.compare(ACKNOWLEDGE_MESSAGE) == 0)
+            continue;
 
         // Sends all other messages to the server.
         send_message(this->network_socket, command_buffer);

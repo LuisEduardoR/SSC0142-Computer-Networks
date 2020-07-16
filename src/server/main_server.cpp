@@ -215,8 +215,10 @@ void server::handle() {
                 break;
         }
 
-        if(admin_failed) // Sends a warning to the client that a request failed because it's not an admin.
-            origin->spawn_send_message_worker(new std::string("server: you must be an admin to do that!"));
+        if(admin_failed) { // Sends a warning to the client that a request failed because it's not an admin.
+            std::string error_msg("server: you must be an admin to do that!");
+            origin->send(error_msg);
+        }
         
     }
 
@@ -454,7 +456,7 @@ void server::make_request(connected_client *origin, std::string content) {
             if (command.compare("/send") == 0)
                 r_type = rt_Send;
             else if(command.compare("/nickname") == 0)
-                r_type = rt_Send;           
+                r_type = rt_Nickname;           
             else if(command.compare("/join") == 0)
                 r_type = rt_Join;
             else if(command.compare("/kick") == 0)
@@ -469,7 +471,8 @@ void server::make_request(connected_client *origin, std::string content) {
 
         // If the request type is invalid sends a warning back to the client and ignores it.
         if(r_type == rt_Invalid) {
-            origin->spawn_send_message_worker(new std::string("server: invalid command or command parameters!"));
+            std::string error_msg("server: invalid command or command parameters!");
+            origin->send(error_msg);
             return;
         }
 
@@ -494,9 +497,14 @@ void server::make_request(connected_client *origin, std::string content) {
         else
             std::cerr << "New request from socket " << origin_socket << ": \"" << content << "\"" << std::endl;
 
+        return;
+
     }
 
-    std::cerr << "Invalid request from socket " << origin_socket + "! Ignoring...";
+    if(content.size() > 20)
+        std::cerr << "Invalid request from socket " << origin_socket << ": \"" << content.substr(0, 20) << "...\"! Ignoring..." << std::endl;
+    else
+        std::cerr << "Invalid request from socket " << origin_socket << ": \"" << content << "\"! Ignoring..." << std::endl;
 
 }
 
@@ -508,7 +516,8 @@ void server::send_request(connected_client *origin, std::string &message) {
 
     // If the client is not on a valid channel sends an error message.
     if(target_channel_index < 0) {
-        origin->spawn_send_message_worker(new std::string("server: you need to join a channel before sending messages!"));
+        std::string error_msg("server: you need to join a channel before sending messages!");
+        origin->send(error_msg);
         return;
     }
 
@@ -533,7 +542,8 @@ void server::send_request(connected_client *origin, std::string &message) {
             // Gets the target client.
             connected_client *target_client = this->get_client_ref(message_targets[i]);
             if(target_client != nullptr) {
-                target_client->spawn_send_message_worker(new std::string(channel_name + " " + client_name + " " + message));
+                std::string complete_message = channel_name + " " + client_name + " " + message;
+                target_client->send(complete_message);
             }
         }
 
@@ -541,7 +551,8 @@ void server::send_request(connected_client *origin, std::string &message) {
         delete[] message_targets;
 
     } else { // Sends a message warning the client that it is muted.
-        origin->spawn_send_message_worker(new std::string("server: you are currently muted on the channel!"));
+        std::string error_msg("server: you are currently muted on the channel!");
+        origin->send(error_msg);
         return;
     }
 
@@ -553,40 +564,48 @@ void server::nickname_request(connected_client *origin, std::string &nickname) {
     // Checks if the nickname doesn't exist on the server.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     if(this->get_client_ref(nickname) != nullptr) {
-        origin->spawn_send_message_worker(new std::string("server: this nickname already exists!"));
+        std::string error_msg("server: this nickname already exists!");
+        origin->send(error_msg);
         return;
     }
 
     // Tries updating the nickname and sends a message to the client telling the results.
-    if(origin->set_nickname(nickname))
-        origin->spawn_send_message_worker(new std::string("server: your nickname was changed to " + nickname + "!"));
-    else
-        origin->spawn_send_message_worker(new std::string("server: this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)"));
+    if(origin->set_nickname(nickname)) {
+        std::string error_msg("server: your nickname was changed to " + nickname + "!");
+        origin->send(error_msg);
+    } else {
+        std::string error_msg("server: this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)");
+        origin->send(error_msg);
+    }
 
 }
 
 /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
 void server::join_request(connected_client *origin, std::string &channel_name) {
     // TODO: join request.
-    origin->spawn_send_message_worker(new std::string("/join request not available..."));
+    std::string error_msg("server: /join request not available...");
+    origin->send(error_msg);
 }
 
 /* Tries kicking a client that must be in the same channel. */
 void server::kick_request(connected_client *origin, std::string &nickname) {
     // TODO: kick request only for admins.
-    origin->spawn_send_message_worker(new std::string("/kick request not available..."));
+    std::string error_msg("server: /kick request not available...");
+    origin->send(error_msg);
 }
 
 /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
 void server::toggle_mute_request(connected_client *origin, std::string &nickname, bool muted) {
     // TODO: mute/unmute request only for admins.
-    origin->spawn_send_message_worker(new std::string("/mute/unmute request not available..."));
+    std::string error_msg("server: /mute/unmute request not available...");
+    origin->send(error_msg);
 }
 
 /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
 void server::whois_request(connected_client *origin, std::string &nickname) {
     // TODO: whois request only for admins.
-    origin->spawn_send_message_worker(new std::string("/whois request not available..."));
+    std::string error_msg("server: /whois request not available...");
+    origin->send(error_msg);
 }
 
 // ==============================================================================================================================================================
