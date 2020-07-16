@@ -8,9 +8,16 @@
 # include <iostream>
 # include <string>
 
-# include <mutex>
+# include <set>
+# include <vector>
 
-// Creates a channel with an index and a name.
+# include <atomic>
+
+// ==============================================================================================================================================================
+// Constructors/destructors =====================================================================================================================================
+// ==============================================================================================================================================================
+
+// Creates a channel with an index and a name, also passes an instance of the server.
 channel::channel(int index, std::string name, server *server_instance) {
 
     this->index = index;
@@ -19,177 +26,142 @@ channel::channel(int index, std::string name, server *server_instance) {
 
 }
 
-bool channel::add_client(connected_client *client) {
+// ==============================================================================================================================================================
+// Statics ======================================================================================================================================================
+// ==============================================================================================================================================================
 
-    bool success = false;
+/* Returns if a given name is a valid channel name. */
+bool channel::is_valid_channel_name(std::string &channel_name) {
 
-    // Gets the old client channel.
-    int old_channel_index = client->l_get_channel();
-
-    // If the client is already on this channel, does nothing.
-    if(old_channel_index == this->index)
+    // Checks if the channel name has an invalid size.
+    if(channel_name.length() > MAX_CHANNEL_NAME_SIZE) // Checks for valid size.
         return false;
 
-    // Removes the client from his current channel if his already in one.
-    if(old_channel_index >= 0) {
+    // Checks for invalid stater characters.
+    if(channel_name[0] != '&' && channel_name[0] != '#')
+        return false;
 
-        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        this->server_instance->updating_channels.lock();
-
-        // ENTER CRITICAL REGION =======================================
-        this->server_instance->channels[old_channel_index]->remove_client(client);
-        // EXIT CRITICAL REGION ========================================
-
-        // Exits the critical region, and opens the semaphore.
-        this->server_instance->updating_channels.unlock();
+    // Checks for invalid characters on the whole channel name.
+    for(auto it = channel_name.begin(); it != channel_name.end(); it++) { 
+        if(*it == ' ' || *it == 7 || *it == ',')
+            return false;
     }
 
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating.lock();
-
-    // ENTER CRITICAL REGION =======================================
-
-    // Sets the client new channel and role.
-    success = client->l_set_channel(this->index, CLIENT_ROLE_NORMAL);
-
-    // Adds client to this channel's members and removes from the old if it has changed channels successfully.
-    if(success)
-        this->members.insert(client); // Add to new channel.
-
-    // EXIT CRITICAL REGION ========================================
-
-    // Exits the critical region, and opens the semaphore.
-    this->updating.unlock();
-
-    if(success) {
-        std::cerr << "Client with socket " << client->client_socket << " is now on channel " << this-> name << "! ";
-        std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
-        return true;
-    }
-    
-    std::cerr << "Error moving client with socket " << client->client_socket << " to channel " << this-> name << "! ";
-    return false;   
+    // If nothing invalid was found the channel name is valid.
+    return true;
 
 }
 
-// Removes client from the members list.
-bool channel::remove_client(connected_client *client) {
+// ==============================================================================================================================================================
+// Add/remove ===================================================================================================================================================
+// ==============================================================================================================================================================
 
-    bool success = false;
+/* Adds client with socket provided to the members list. */
+bool channel::add_member(int socket) {
 
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating.lock();
+    /* Adds the new client socket to the server. */
+    if(this->members.find(socket) == this->members.end()) { // Checks if the client is already on this channel.
 
-    // ENTER CRITICAL REGION =======================================
+        this->members.insert(socket); // Add to channel members.
 
-    // Sets the client channel to none (note that if the client exited the channel orderly it should be sent back to the idle channel).
-    success = client->l_set_channel(CLIENT_NO_CHANNEL, CLIENT_NO_CHANNEL);
-    
-    // Adds client to the channel members if it has changed channels successfully.
-    if(success) this->members.erase(client);   
-    
-    // EXIT CRITICAL REGION ========================================
-
-    // Exits the critical region, and opens the semaphore.
-    this->updating.unlock();
-
-    if(success) {
-        
-        std::cerr << "Client with socket " << client->client_socket << " left channel " << this-> name << "! ";
+        std::cerr << "Client with socket " << socket << " is now on channel " << this-> name << "! ";
         std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
-
-        // Deletes the channel if it's now empty.
-        if(this->members.size() < 1)
-            this->server_instance->delete_channel(this->index);
-
         return true;
+
     }
 
-    std::cerr << "Error removing client with socket " << client->client_socket << " from channel " << this-> name << "! ";
+    std::cerr << "Error adding client with socket " << socket << " to channel " << this-> name << ": client is already on the channel! ";
+    return false; 
+
+}
+
+/* Removes client with socket provided from the members list. */
+bool channel::remove_member(int socket) {
+
+    /* Removes the client from the server. */
+    auto iter = this->members.find(socket); // Tries getting an iterator to the client socket to be removed.
+    if(iter != this->members.end()) { // Checks if the client is on the channel.
+
+        this->members.erase(iter); // Add to channel members.
+
+        // Now tries removing from the muted list.
+        iter = this->members.find(socket); // Tries getting an iterator to the client socket being removed on the muted list.
+        if(iter != this->members.end()) // Removes the client socket from the muted list if necessary.
+            this->muted.erase(iter);
+
+        std::cerr << "Client with socket " << socket << " left channel " << this-> name << "! ";
+        std::cerr << "(Channel members: " << std::to_string(this->members.size()) << ")" << std::endl;
+        return true;
+
+    }
+        
+    std::cerr << "Error removing client with socket " << socket << " from channel " << this-> name << ": client is not on the channel! ";
     return false;
 
 }
 
-// Posts a message on the channel sending it to all members.
-bool channel::post_message(connected_client *sender, std::string message) {
+// ==============================================================================================================================================================
+// Member operations ============================================================================================================================================
+// ==============================================================================================================================================================
 
-    bool success = false;
+/* Mutes and unmutes members of the channel. */
+bool channel::toggle_mute_member(int socket, bool muted) {
 
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating.lock();
+    // Tries getting an iterator to the client socket being muted/unmuted.
+    auto iter = this->muted.find(socket);
 
-    // ENTER CRITICAL REGION =======================================
-
-    // Send the message if client isn't muted.
-    if(this->muted.find(sender) == this->muted.end()) {
-
-        for(auto it = this->members.begin(); it != this->members.end(); it++) {
-
-            // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-            (*it)->updating.lock();
-
-            // ENTER CRITICAL REGION =======================================
-            // Creates the worker thread.
-            std::thread worker(&connected_client::t_send_message_worker, (*it), new std::string(this->name + " " + message));
-            worker.detach();
-            // EXIT CRITICAL REGION ========================================
-
-            // Exits the critical region, and opens the semaphore.
-            (*it)->updating.unlock();
-        }
-
-        // Mark that the message has being sent.
-        success = true;
-
+    // Adds the client socket to the muted list if it's not currently there.
+    if(muted && iter == this->muted.end()) {
+        this->muted.insert(socket);
+        return true;
+    } 
+    
+    // Removes the client socket from the muted list if it's currently there.
+    if(!muted && iter != this->muted.end()) { 
+        this->muted.erase(iter);
+        return true;
     }
-    // EXIT CRITICAL REGION ========================================
 
-    // Exits the critical region, and opens the semaphore.
-    this->updating.unlock();
-
-    return success;
+    return false;
 
 }
 
-// Mutes and unmutes clients on the channel.
-bool channel::l_toggle_mute_client(connected_client *client, bool muted) {
 
-    bool success = false;
+/* Checks if a certain client is muted on the server. */
+bool channel::is_muted(int socket) { return (this->muted.find(socket) != this->muted.end()); }
 
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    this->updating.lock();
+// ==============================================================================================================================================================
+// Getters ======================================================================================================================================================
+// ==============================================================================================================================================================
 
-    // ENTER CRITICAL REGION =======================================
-    // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-    client->updating.lock();
+/* Gets this channel's index. */
+int channel::get_index() { return this->index; }
 
-        // ENTER CRITICAL REGION =======================================
+/* Checks if a certain client is the admin of the server. */
+std::string channel::get_name() { return this->name; }
 
-        if(muted) {
-            // Adds the client to the muted list if it's not currently there.
-            if(this->muted.find(client) == this->muted.end()) {
-                this->muted.insert(client);
-                success = true;
-            }
+/* Gets an array of this channel's members sockets (it needs to be deleted later), and stores it's size on r_size 
+if passed as something other than nullptr. */
+int *channel::get_members(int *r_size) {
 
-        } else {
-            // Removes the client from the muted list if it's currently there.
-            auto it = this->muted.find(client);
-            if(it != this->muted.end()) {
-                this->muted.erase(it);
-                success = true;
-            }
+    // Stores the value to be returned.
+    int *members = nullptr;
 
+    // Checks if there are actually members on this channel (in theory there should be at least one: the admin).
+    if(this->members.size() > 0) {
+        // Allocates enough space on the array.
+        members = new int[this->members.size()];
+        // Copies the members to the array.
+        int cur_index = 0;
+        for(auto it = this->members.begin(); it != this->members.end(); it++) {
+            members[cur_index] = *it;
+            cur_index++;
         }
-        // EXIT CRITICAL REGION ========================================
+        // Stores the array size if necessary.
+        if(r_size != nullptr)
+            *r_size = this->members.size();
+    }
 
-    // Exits the critical region, and opens the semaphore.
-    client->updating.unlock();
-    // EXIT CRITICAL REGION ========================================
-
-    // Exits the critical region, and opens the semaphore.
-    this->updating.unlock();
-
-    return success;
+    return members;
 
 }

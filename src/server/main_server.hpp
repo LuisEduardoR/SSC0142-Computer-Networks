@@ -6,17 +6,18 @@
 # ifndef SERVER_H
 # define SERVER_H
 
+# include "channel.hpp"
+# include "request.hpp"
+# include "connected_client.hpp"
+
 # include <vector>
 # include <queue>
+
 # include <thread>
 # include <mutex>
 
 # include <arpa/inet.h>
 # include <netinet/in.h>
-
-# include "channel.hpp"
-# include "request.hpp"
-# include "connected_client.hpp"
 
 # define BACKLOG_LEN 8 // Max connections backlog
 
@@ -30,87 +31,53 @@ class server
 {
     public:
 
-        // CONSTRUCTOR
-        server(int port_number);
+        // ==============================================================================================================================================================
+        // Constructors/destructors =====================================================================================================================================
+        // ==============================================================================================================================================================
 
-        // DESTRUCTOR
+        server(int port_number);
         ~server();
 
-        // Handles the server instance (control of the program is given to the server until it finishes).
-        void handle();
-
-        // Used to mark that the server connections are being updated.
-        std::mutex updating_connections;
-
-        // Stores the client connections.
-        std::vector<connected_client*> client_connections;
-
-        // Used to mark that the server channels are being updated.
-        std::mutex updating_channels;
-
-        // Stores the server channels.
-        std::vector<channel*> channels;
-
-        // Used as a thread to check for connecting clients.
-        void t_check_for_connections();
-
-        // Creates a new channel on this server.
-        bool create_channel(std::string name, connected_client *admin);
-
-        // Deletes a new channel on this server.
-        bool delete_channel(int index);
-
-        // Removes a client from the server.
-        void remove_client(connected_client *connection);
-
-        // Gets a reference to a client with a certain nickname (gets lock).
-        connected_client *l_get_client_by_name(std::string client_nickname);
+        // ==============================================================================================================================================================
+        // Server =======================================================================================================================================================
+        // ==============================================================================================================================================================
 
         /* Returns the status of the server */
         int get_status();
 
-        /* Handles the connection of new clients */
-        void thread_handle_connections();
-        /* Handles the execution of client requests. */
-        void thread_handle_requests();
-        
+        /* Handles the server instance (control of the thread is given to the server until it finishes). */
+        void handle();
+
         // ==============================================================================================================================================================
+        // Requests =====================================================================================================================================================
         // ==============================================================================================================================================================
-        // ==============================================================================================================================================================
-
-        /* Adds a new client to the server. (gets a lock to the clients list during execution) */
-        void add_client(int socket);
-
-        /* Returns a reference to a client with a certain socket. (gets a lock to the clients list during execution) */
-        connected_client *l_get_client_ref(int socket);
-
-        /* Returns a reference to a client with a certain nickname. (gets a lock to the clients list during execution) */
-        connected_client *l_get_client_ref(std::string &nickname);
-
-        /* Removes the client with the given socket from the server.(gets a lock to the clients list during execution) */
-        void remove_client(int socket);
 
         /* Makes a request to the server, that will be added to the request queue and handled as soon as possible. (gets a lock to the request_queue during execution) */
-        void make_request(request new_request);
-
-        // ==============================================================================================================================================================
+        void make_request(connected_client *origin, std::string content);
 
     private:
 
-        // Used to store information about the server socket and address.
+        // ==============================================================================================================================================================
+        // Variables ====================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Used to store information about the server socket and address. */
         int server_socket;
         struct sockaddr_in server_address;
-        // Stores the status of the server
+
+        /* Stores the status of the server */
         int server_status;
 
-        // ==============================================================================================================================================================
-        // ==============================================================================================================================================================
-        // ==============================================================================================================================================================
+        /* Used to store new clients that just connected to the server, before they are transferred to the main list that's used for processing requests. */
+        std::queue<connected_client*> new_clients;
+        /* Used to lock the new clients list when reading or writing to it. */
+        std::mutex updating_new_clients;
 
-        // Used to store the clients connected to the server.
+        // Used to store the clients connected to the server that are currently being listened to and who's requests are being processed.
         std::set<connected_client*> clients;
-        // Used to lock the connected client list when reading or writing to it.
-        std::mutex updating_clients;
+
+        // Used to store the server's current channels.
+        std::vector<channel*> channels;
 
         // Used to store requests that need to be executed by the server.
         std::queue<request> request_queue;
@@ -118,11 +85,65 @@ class server
         std::mutex updating_request_queue;
 
         // ==============================================================================================================================================================
+        // Client handling ==============================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Separate thread to handle the connection of new clients */
+        void t_handle_connections();
+        
+        /* Checks for changes in client connections. Adding or removing them if necessary. */
+        void check_connections();
+
+        /* Removes the client with the given socket from the server. */
+        void kill_client(connected_client *connection);
+
+        // ==============================================================================================================================================================
+        // Creates/deletes channels =====================================================================================================================================
+        // ==============================================================================================================================================================
+        
+        // Creates a new channel on this server.
+        bool create_channel(std::string name, int admin_socket);
+
+        // Deletes a new channel on this server.
+        bool delete_channel(int index);
+
+        // ==============================================================================================================================================================
+        // Getters ======================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Returns a reference to a client with a certain socket. */
+        connected_client *get_client_ref(int socket);
+
+        /* Returns a reference to a client with a certain nickname. */
+        connected_client *get_client_ref(std::string &nickname);
+
+        /* Returns a reference to a channel with a certain index. */
+        channel *get_channel_ref(int index);
+
+        /* Returns a reference to a channel with a certain name. */
+        channel *get_channel_ref(std::string &name);
+
+        // ==============================================================================================================================================================
         // Requests =====================================================================================================================================================
         // ==============================================================================================================================================================
 
-        /* Tries changing the nickname of a certain client */
-        void nickname_request(connected_client *client, std::string &nickname);
+        /* Sends a message from a client to other clients on it's channel. */
+        void send_request(connected_client *origin, std::string &message);
+
+        /* Tries changing the nickname of a certain client. */
+        void nickname_request(connected_client *origin, std::string &nickname);
+
+        /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
+        void join_request(connected_client *origin, std::string &channel_name);
+
+        /* Tries kicking a client that must be in the same channel. */
+        void kick_request(connected_client *origin, std::string &nickname);
+
+        /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
+        void toggle_mute_request(connected_client *origin, std::string &nickname, bool muted);
+
+        /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
+        void whois_request(connected_client *origin, std::string &nickname);
 
 
 };

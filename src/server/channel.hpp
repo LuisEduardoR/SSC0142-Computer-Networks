@@ -6,10 +6,14 @@
 # ifndef CHANNEL_H
 # define CHANNEL_H
 
-# include <set>
-# include <mutex>
-
 # include "main_server.hpp"
+
+# include <string>
+
+# include <set>
+# include <vector>
+
+# include <atomic>
 
 # define MAX_CHANNEL_NAME_SIZE 200 // Max size of a channel name.
 
@@ -23,37 +27,71 @@ class channel
 
     public:
 
-        // CONSTRUCTOR
+        // ==============================================================================================================================================================
+        // Constructors/destructors =====================================================================================================================================
+        // ==============================================================================================================================================================
+
         channel(int index, std::string name, server *server_instance);
 
-        // Used to lock the channel for updates that need to be done safely.
-        std::mutex updating;
+        // ==============================================================================================================================================================
+        // Statics ======================================================================================================================================================
+        // ==============================================================================================================================================================
 
-        // Stores an instance to the server this client is connected to.
-        server *server_instance;
+        /* Returns if a given name is a valid channel name. */
+        static bool is_valid_channel_name(std::string &channel_name);
 
-        // Index of the channel on the server channel list.
-        int index;
-        // Name used to refer to this channel by clients.
-        std::string name;
+        // ==============================================================================================================================================================
+        // Add/remove ===================================================================================================================================================
+        // ==============================================================================================================================================================
 
-        // Stores the channel members.
-        std::set<connected_client*> members;
+        /* Adds and removes clients with the provided sockets to/from the members list. */
+        bool add_member(int socket);
+        bool remove_member(int socket);
 
-        // Adds and removes clients to the members list.
-        bool add_client(connected_client *client);
-        bool remove_client(connected_client *client);
+        // ==============================================================================================================================================================
+        // Member operations ============================================================================================================================================
+        // ==============================================================================================================================================================
 
-        // Stores the muted members.
-        std::set<connected_client*> muted;
+        /* Mutes and unmutes members of the channel. */
+        bool toggle_mute_member(int socket, bool muted);
 
-        // Mutes and unmutes clients on the channel.
-        bool l_toggle_mute_client(connected_client *client, bool muted);
+        /* Checks if a certain client is muted on the server. */
+        bool is_muted(int socket);
 
-        // Posts a message on the channel sending it to all members.
-        bool post_message(connected_client *sender, std::string message);
+        // ==============================================================================================================================================================
+        // Getters ======================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Gets this channel's index. */
+        int get_index();
+
+        /* Checks if a certain client is the admin of the server. */
+        std::string get_name();
+
+        /* Gets an array of this channel's members sockets (it needs to be deleted later), and stores it's size on r_size 
+        if passed as something other than nullptr. */
+        int *get_members(int *r_size);
 
     private:
+
+        // ==============================================================================================================================================================
+        // Variables=====================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Stores an instance to the server that has this channel */
+        server *server_instance;
+
+        /* Index of the channel on the server channel list. */
+        int index;
+
+        /* Name used to refer to this channel by clients. */
+        std::string name;
+
+        /* Stores the channel members, stores the sockets of the clients. */
+        std::set<int> members;
+
+        /* Stores the muted members. */
+        std::set<int> muted;
 
 };
 

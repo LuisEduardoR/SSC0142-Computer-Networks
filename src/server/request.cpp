@@ -7,21 +7,32 @@
 
 # include <string>
 
-// CONSTRUCTOR
+// ==============================================================================================================================================================
+// Constructors/destructors =====================================================================================================================================
+// ==============================================================================================================================================================
+
 request::request() {
 
     this->origin_socket = -1;
-    this->content = "/none";
+    this->r_type = rt_Invalid;
+    this->data = "/none";
 
 }
 
-// CONSTRUCTOR
-request::request(int origin_socket, std::string content) {
+request::request(int origin_socket, request_type r_type, std::string data) {
 
     this->origin_socket = origin_socket;
-    this->content = content;
+    this->r_type = r_type;
+    this->data = data;
 
 }
 
+// ==============================================================================================================================================================
+// Getters ======================================================================================================================================================
+// ==============================================================================================================================================================
+
 int request::get_origin_socket() { return this->origin_socket; }
-std::string request::get_content() { return this->content; }
+
+request_type request::get_type() { return this->r_type; }
+
+std::string request::get_data() { return this->data; }

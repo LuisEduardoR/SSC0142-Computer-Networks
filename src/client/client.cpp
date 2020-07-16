@@ -150,53 +150,8 @@ void client::handle() {
         // Sends all other messages to the server.
         send_message(this->network_socket, command_buffer);
 
-        // Prints a message for the /send command
-        if(command_buffer.substr(0,6).compare("/send ") == 0) {
-            std::cout << std::endl << "Message sent to server..." << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /ping command
-        if(command_buffer.substr(0,5).compare("/ping") == 0 && command_buffer.length() == std::string("/ping").length()) {
-            std::cout << std::endl << "Ping sent to server... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /nickname command
-         if(command_buffer.substr(0,10).compare("/nickname ") == 0) {
-            std::cout << std::endl << "Trying to change nickname... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /join command
-         if(command_buffer.substr(0,6).compare("/join ") == 0) {
-            std::cout << std::endl << "Trying to join channel... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /kick command
-        if(command_buffer.substr(0,6).compare("/kick ") == 0) {
-            std::cout << std::endl << "Kick attempt sent to server... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /mute command
-        if(command_buffer.substr(0,6).compare("/mute ") == 0) {
-            std::cout << std::endl << "Mute attempt sent to server... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /unmute command
-        if(command_buffer.substr(0,8).compare("/unmute ") == 0) {
-            std::cout << std::endl << "Unmute attempt sent to server... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
-
-        // Prints a message for the /whois command
-        if(command_buffer.substr(0,7).compare("/whois ") == 0) {
-            std::cout << std::endl << "Whois sent to server... Use /new to check for the server response!" << std::endl;
-            continue;
-        }
+        // Prints a message saying that the command was sent to server.
+        std::cout << std::endl << "Command sent to server..." << std::endl;
 
     } while (!atmc_close_client_flag);
 
