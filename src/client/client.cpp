@@ -88,17 +88,27 @@ void client::handle() {
     // Store commands received.
     std::string command_buffer;
 
-    // Asks for a initial nickname on the server.
-    std::cout << std::endl << "Enter a nickname:" << std::endl << std::endl;
+    // Asks for an initial nickname on the server.
+    std::cout << std::endl << "Enter a nickname to be used:" << std::endl << std::endl;
 
     // Receives the nickname.
     std::getline(std::cin, command_buffer);
-
     
     // Sends the nickname to the server.
     command_buffer = "/nickname " + command_buffer;
     send_message(this->network_socket, command_buffer);
     std::cout << std::endl << COLOR_BOLD_YELLOW << "Nickname sent to server... Use /new to check for the server response! If your nickname is invalid you will be given a default nickname that can be changed later!" << COLOR_DEFAULT << std::endl;
+
+     // Asks for an initial channel on the server to trie joining.
+    std::cout << std::endl << "Enter a channel name to join (channel names must start with '#' or '&'):" << std::endl << std::endl;
+
+    // Receives the channel name.
+    std::getline(std::cin, command_buffer);
+    
+    // Sends the channel name to the server.
+    command_buffer = "/join " + command_buffer;
+    send_message(this->network_socket, command_buffer);
+    std::cout << std::endl << COLOR_BOLD_YELLOW << "Join channel attempt sent to server... Use /new to check for the server response! If your channel name was invalid you will be need to join a channel later!" << COLOR_DEFAULT << std::endl;
 
     do {
 
