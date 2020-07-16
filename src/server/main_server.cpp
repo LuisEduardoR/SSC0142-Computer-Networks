@@ -581,7 +581,7 @@ void server::send_request(connected_client *origin, std::string &message) {
             // Gets the target client.
             connected_client *target_client = this->get_client_ref(message_targets[i]);
             if(target_client != nullptr) {
-                std::string complete_message = target_channel_name + " " + client_name + " " + message;
+                std::string complete_message = COLOR_BLUE + target_channel_name + COLOR_CYAN + " " + client_name + ": " + COLOR_DEFAULT + message;
                 target_client->send(complete_message);
             }
         }
@@ -700,9 +700,77 @@ void server::kick_request(connected_client *origin, std::string &nickname) {
 
 /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
 void server::toggle_mute_request(connected_client *origin, std::string &nickname, bool muted) {
-    // TODO: mute/unmute request only for admins.
-    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /mute/unmute request not available...");
-    origin->send(error_msg);
+
+    // Gets a reference to the target client that will have it's ip sent.
+    connected_client *target_client = this->get_client_ref(nickname);
+
+    // Checks if the target client exists and sends an error message if it does not.
+    if(target_client == nullptr) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Gets a reference to the target channel in which the admin is.
+    std::string target_channel_name = origin->get_channel();
+    channel *target_channel = this->get_channel_ref(target_channel_name);
+
+    // If the admin is not on a valid channel sends an error message.
+    if(target_channel == nullptr) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before doing this!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Ensures admin and client are in the same channel, sends an error message if they are not.
+    if(origin->get_channel().compare(target_client->get_channel()) != 0) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }   
+
+    // Tries muting the target client.
+    bool success = target_channel->toggle_mute_member(target_client->get_socket(), muted);
+
+    // Sends a message with the results.
+    if(muted) {
+
+        // Sends success message.
+        if(success) {
+            
+            // Sends message to the admin.            
+            std::string mute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is now muted!";
+            origin->send(mute_msg);
+
+            // Sends message to the target.
+            mute_msg = COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are now muted on the current channel!" + COLOR_DEFAULT;
+            target_client->send(mute_msg);
+
+        } else { // Sends error message.
+            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
+            origin->send(error_msg);
+        }
+
+    } else {
+
+        // Sends success message.
+        if(success) {
+
+            // Sends message to the admin.            
+            std::string unmute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is no longer muted!";
+            origin->send(unmute_msg);
+
+            // Sends message to the target.
+            unmute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you are no longer muted on the current channel!";
+            target_client->send(unmute_msg);
+            
+        } else { // Sends error message.
+            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
+            origin->send(error_msg);
+        }
+
+    }
+
 }
 
 /* Tries finding and showing the IP of a client a player that must be in the same channel. */
@@ -730,213 +798,3 @@ void server::whois_request(connected_client *origin, std::string &nickname) {
     origin->send(kick_msg);
 
 }
-
-// ==============================================================================================================================================================
-// Commands =====================================================================================================================================================
-// ==============================================================================================================================================================
-/*
-
-// Tries joining a server channel.
-bool connected_client::join_channel(std::string channel_name) {
-
-    // Searches for the target channel.
-    channel *target_channel = nullptr;
-    for(auto it = this->server_instance->channels.begin(); it != this->server_instance->channels.end(); it++) {
-        if((*it)->name.compare(channel_name) == 0) {
-            target_channel = *it;
-            break;
-        }
-    }
-
-    // Stores if the client has had success joining the channel.
-    bool success = false;
-
-    // If no channel exists tries creating a channel with this client as admin.
-    if(target_channel == nullptr) {
-
-        // Creates the channel and adds the client as admin.
-        success = this->server_instance->create_channel(channel_name, this);
-
-        // Sends a message with the results.
-        if(success) {
-            
-            // Sends a message to enable showing the admin commands.
-            std::thread worker_enable_commands(&connected_client::t_send_message_worker, this, new std::string("/show_admin_commands"));
-            worker_enable_commands.detach();
-
-            // Sends a message with text to warn the client of the success.
-            std::thread worker_warning(&connected_client::t_send_message_worker, this, new std::string("server: you're now on channel " + channel_name + " as an admin!"));
-            worker_warning.detach();
-
-        } else {
-            std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: the channel " + channel_name + " doesn't exist and can't be created! (Invalid name: it has to start with either '#' or '&' and must not contain spaces or commas)"));
-            worker.detach();
-        }
-
-    } else { // If a channel exists tries joining it.
-
-        // Tries changing the channel.
-        success = target_channel->add_client(this);
-
-        // Sends a message to disable showing the admin commands.
-        std::thread worker_enable_commands(&connected_client::t_send_message_worker, this, new std::string("/hide_admin_commands"));
-        worker_enable_commands.detach();
-
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: you're now on channel " + channel_name + "!"));
-        worker.detach();
-
-    }
-
-    return success;
-
-}
-
-// Kicks the client with the given nickname.
-bool connected_client::kick_client(std::string client_name) {
-
-    // Gets the target client.
-    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
-
-    // If the client wasn't found returns.
-    if(target_client == nullptr) {
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
-        worker.detach();
-        return false;
-    }
-
-    // Checks if the this client and the target are on the same channel.
-    if(target_client->l_get_channel() == this->l_get_channel()) {
-
-        // Removes the client.
-        shutdown(target_client->client_socket, SHUT_RDWR);
-        this->server_instance->remove_client(target_client);
-
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: kicked " + client_name + "!"));
-        worker.detach();
-
-        return true;
-
-    } else {
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
-        worker.detach();
-        return false;
-    }
-
-}
-
-// Mutes the client with the given nickname on the curren channel.
-bool connected_client::toggle_mute_client(std::string client_name, bool muted) {
-
-    // Gets the target client.
-    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
-
-    // If the client wasn't found returns.
-    if(target_client == nullptr) {
-        // Sends a message with the results.
-        std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
-        admin_worker.detach();
-        return false;
-    }
-
-    // Checks if the this client and the target are on the same channel.
-    int target_channel = this->l_get_channel();
-    if(target_channel == target_client->l_get_channel()) {
-
-        // Checks if the nickname doesn't exist on the server.
-        // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
-        this->server_instance->updating_channels.lock();
-        // ENTER CRITICAL REGION =======================================   
-       // Mutes or unmutes the client on the channel.
-        bool success = this->server_instance->channels[target_channel]->l_toggle_mute_client(target_client, muted);
-        std::string target_channel_name = this->server_instance->channels[target_channel]->name;
-        // EXIT CRITICAL REGION ========================================
-        // Exits the critical region, and opens the semaphore.
-        this->server_instance->updating_channels.unlock();
-
-        // Sends a message with the results.
-        if(muted) {
-
-            if(success) {
-
-                // Creates the worker thread for the admin.
-                std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: muted " + client_name + "!"));
-                admin_worker.detach();
-
-                // Creates the worker thread for the target.
-                std::thread target_worker(&connected_client::t_send_message_worker, target_client, new std::string("server: you have been muted on channel " + target_channel_name + "!"));
-                target_worker.detach();
-            } else {
-
-                // Creates the worker thread for the admin.
-                std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: " + client_name + " is already muted!"));
-                admin_worker.detach();
-
-            }
-
-        } else {
-
-            if(success) {
-
-                // Creates the worker thread for the admin.
-                std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: un-muted " + client_name + "!"));
-                admin_worker.detach();
-
-                // Creates the worker thread for the target.
-                std::thread target_worker(&connected_client::t_send_message_worker, target_client, new std::string("server: you have been un-muted on channel " + target_channel_name + "!"));
-                target_worker.detach();
-
-            } else {
-
-                // Creates the worker thread for the admin.
-                std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: " + client_name + " isn't muted!"));
-                admin_worker.detach();
-
-            }
-        }
-
-        return success;
-
-    } else {
-        // Sends a message with the results.
-        std::thread admin_worker(&connected_client::t_send_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
-        admin_worker.detach();
-        return false;
-    }
-
-}
-
-// Prints the IP of a client to the admin.
-bool connected_client::whois_client(std::string client_name) {
-
-    // Gets the target client.
-    connected_client *target_client = this->server_instance->l_get_client_by_name(client_name);
-
-    // If the client wasn't found returns.
-    if(target_client == nullptr) {
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: no client with nickname " + client_name + "!"));
-        worker.detach();
-        return false;
-    }
-
-    // Checks if the this client and the target are on the same channel.
-    if(target_client->l_get_channel() == this->l_get_channel()) {
-
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: the ip for " + client_name + " is " + target_client->l_get_ip() + "."));
-        worker.detach();
-
-        return true;
-
-    } else {
-        // Sends a message with the results.
-        std::thread worker(&connected_client::t_send_message_worker, this, new std::string("server: the client needs to be in the same channel as you for this action!"));
-        worker.detach();
-        return false;
-    }   
-}
-*/

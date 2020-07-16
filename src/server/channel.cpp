@@ -81,11 +81,11 @@ bool channel::remove_member(int socket) {
     auto iter = this->members.find(socket); // Tries getting an iterator to the client socket to be removed.
     if(iter != this->members.end()) { // Checks if the client is on the channel.
 
-        this->members.erase(iter); // Add to channel members.
+        this->members.erase(iter); // Remvoes from channel members.
 
         // Now tries removing from the muted list.
-        iter = this->members.find(socket); // Tries getting an iterator to the client socket being removed on the muted list.
-        if(iter != this->members.end()) // Removes the client socket from the muted list if necessary.
+        iter = this->muted.find(socket); // Tries getting an iterator to the client socket being removed on the muted list.
+        if(iter != this->muted.end()) // Removes the client socket from the muted list if necessary.
             this->muted.erase(iter);
 
         std::cerr << "Client with socket " << socket << " left channel " << this-> name << "! ";
