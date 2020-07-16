@@ -25,7 +25,7 @@ channel::channel(std::string name) { this->name = name; }
 // ==============================================================================================================================================================
 
 /* Returns if a given name is a valid channel name. */
-bool channel::is_valid_channel_name(std::string &channel_name) {
+bool channel::is_valid_channel_name(const std::string &channel_name) {
 
     // Checks if the channel name has an invalid size.
     if(channel_name.length() > MAX_CHANNEL_NAME_SIZE) // Checks for valid size.

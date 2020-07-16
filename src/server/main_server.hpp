@@ -53,7 +53,7 @@ class server
         // ==============================================================================================================================================================
 
         /* Makes a request to the server, that will be added to the request queue and handled as soon as possible. (gets a lock to the request_queue during execution) */
-        void make_request(connected_client *origin, std::string &content);
+        void make_request(connected_client *origin, const std::string &content);
 
     private:
 
@@ -107,10 +107,10 @@ class server
         // ==============================================================================================================================================================
         
         // Creates a new channel on this server.
-        bool create_channel(std::string &channel_name, int admin_socket);
+        bool create_channel(const std::string &channel_name, int admin_socket);
 
         /* Deletes an empty channel on this server. */
-        bool delete_channel(std::string &channel_name);
+        bool delete_channel(const std::string &channel_name);
 
         // ==============================================================================================================================================================
         // Getters ======================================================================================================================================================
@@ -120,32 +120,32 @@ class server
         connected_client *get_client_ref(int socket);
 
         /* Returns a reference to a client with a certain nickname. */
-        connected_client *get_client_ref(std::string &nickname);
+        connected_client *get_client_ref(const std::string &nickname);
 
         /* Returns a reference to a channel with a certain name. */
-        channel *get_channel_ref(std::string &channel_name);
+        channel *get_channel_ref(const std::string &channel_name);
 
         // ==============================================================================================================================================================
         // Requests =====================================================================================================================================================
         // ==============================================================================================================================================================
 
         /* Sends a message from a client to other clients on it's channel. */
-        void send_request(connected_client *origin, std::string &message);
+        void send_request(connected_client *origin, const std::string &message);
 
         /* Tries changing the nickname of a certain client. */
-        void nickname_request(connected_client *origin, std::string &nickname);
+        void nickname_request(connected_client *origin, const std::string &nickname);
 
         /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
-        void join_request(connected_client *origin, std::string &channel_name);
+        void join_request(connected_client *origin, const std::string &channel_name);
 
         /* Tries kicking a client that must be in the same channel. */
-        void kick_request(connected_client *origin, std::string &nickname);
+        void kick_request(connected_client *origin, const std::string &nickname);
 
         /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
-        void toggle_mute_request(connected_client *origin, std::string &nickname, bool muted);
+        void toggle_mute_request(connected_client *origin, const std::string &nickname, bool muted);
 
         /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
-        void whois_request(connected_client *origin, std::string &nickname);
+        void whois_request(connected_client *origin, const std::string &nickname);
 
 };
 

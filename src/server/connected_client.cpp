@@ -68,7 +68,7 @@ connected_client::~connected_client() {
 // ==============================================================================================================================================================
 
 /* Returns if a given nickname is a valid nickname. */
-bool connected_client::is_valid_nickname(std::string &nickname) {
+bool connected_client::is_valid_nickname(const std::string &nickname) {
 
     // Checks if the nickname has an invalid size.
     if(nickname.empty() || nickname.length() > MAX_NICKNAME_SIZE) // Checks for valid size.
@@ -263,7 +263,7 @@ std::string connected_client::get_nickname() {
 }
 
 /* Tries updating the player nickname. */
-bool connected_client::set_nickname(std::string &nickname) {
+bool connected_client::set_nickname(const std::string &nickname) {
 
     // Checks if the nickname is valid.
     if(!connected_client::is_valid_nickname(nickname))
@@ -276,7 +276,7 @@ bool connected_client::set_nickname(std::string &nickname) {
 }
 
 /* Changes the channel this client is connected to. */
-void connected_client::set_channel(std::string &channel_name, int role) {
+void connected_client::set_channel(const std::string &channel_name, int role) {
 
     this->current_channel = channel_name;
     this->channel_role = role;    

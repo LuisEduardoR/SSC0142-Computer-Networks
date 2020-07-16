@@ -14,7 +14,7 @@
 # define ACKNOWLEDGE_MESSAGE "/ack"
 
 // Sends data to a socket.
-void send_message(int socket, std::string &message);
+void send_message(int socket, const std::string &message);
 // Tries receiving data from a socket and storing it on a buffer.
 std::string check_message(int socket, int *status, int need_to_acknowledge);
 

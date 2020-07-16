@@ -56,7 +56,7 @@ class connected_client
         // ==============================================================================================================================================================
 
         /* Returns if a given nickname is a valid nickname. */
-        static bool is_valid_nickname(std::string &nickname);
+        static bool is_valid_nickname(const std::string &nickname);
 
         // ==============================================================================================================================================================
         // Spawns =======================================================================================================================================================
@@ -83,10 +83,10 @@ class connected_client
         std::string get_nickname();
 
         /* Tries updating the player nickname. */
-        bool set_nickname(std::string &nickname);
+        bool set_nickname(const std::string &nickname);
 
         /* Changes the channel this client is connected to. */
-        void set_channel(std::string &channel_name, int role);
+        void set_channel(const std::string &channel_name, int role);
 
         /* Returns the channel this client is connected to. */
         std::string get_channel();

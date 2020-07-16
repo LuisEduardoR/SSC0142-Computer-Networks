@@ -19,7 +19,7 @@ request::request() {
 
 }
 
-request::request(int origin_socket, request_type r_type, std::string data) {
+request::request(int origin_socket, request_type r_type, const std::string data) {
 
     this->origin_socket = origin_socket;
     this->r_type = r_type;

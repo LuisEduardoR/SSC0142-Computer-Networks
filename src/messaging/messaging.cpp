@@ -12,7 +12,7 @@
 # include <sys/socket.h>
 
 // Sends data to a socket.
-void send_message(int socket, std::string &message){
+void send_message(int socket, const std::string &message){
 
     // Gets the message in the format of an array.
     const char * c_str = message.c_str();

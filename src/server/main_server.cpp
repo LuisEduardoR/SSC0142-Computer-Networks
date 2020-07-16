@@ -377,7 +377,7 @@ void server::kill_client(connected_client *connection) {
 // Creates/deletes channels =====================================================================================================================================
 // ==============================================================================================================================================================
 
-bool server::create_channel(std::string &channel_name, int admin_socket) {
+bool server::create_channel(const std::string &channel_name, const int admin_socket) {
 
     // Checks if the channel name is valid.
     if(!channel::is_valid_channel_name(channel_name))
@@ -399,7 +399,7 @@ bool server::create_channel(std::string &channel_name, int admin_socket) {
 }
 
 /* Deletes an empty channel on this server. */
-bool server::delete_channel(std::string &channel_name) {
+bool server::delete_channel(const std::string &channel_name) {
 
     // Gets a reference to the channel.
     channel *target = this->get_channel_ref(channel_name);
@@ -442,7 +442,7 @@ connected_client *server::get_client_ref(int socket) {
 }
 
 /* Returns a reference to a client with a certain nickname. */
-connected_client *server::get_client_ref(std::string &nickname) {
+connected_client *server::get_client_ref(const std::string &nickname) {
 
     // Searches for the client in the list.
     for(auto iter = this->clients.begin(); iter != this->clients.end(); iter++)
@@ -454,7 +454,7 @@ connected_client *server::get_client_ref(std::string &nickname) {
 }
 
 /* Returns a reference to a channel with a certain name. */
-channel *server::get_channel_ref(std::string &channel_name) {
+channel *server::get_channel_ref(const std::string &channel_name) {
 
     // Searches for the channel in the list.
     auto iter = channels.find(channel_name);
@@ -470,7 +470,7 @@ channel *server::get_channel_ref(std::string &channel_name) {
 // ==============================================================================================================================================================
 
 /* Makes a request to the server, that will be added to the request queue and handled as soon as possible (gets a lock to the request_queue during execution) */
-void server::make_request(connected_client *origin, std::string &content) {
+void server::make_request(connected_client *origin, const std::string &content) {
 
     // Gets the origin socket to be used in execution.
     int origin_socket = origin->get_socket();
@@ -550,7 +550,7 @@ void server::make_request(connected_client *origin, std::string &content) {
 }
 
 /* Sends a message from a client to other clients on it's channel. */
-void server::send_request(connected_client *origin, std::string &message) {
+void server::send_request(connected_client *origin, const std::string &message) {
 
     // Gets the client's channel.
     std::string target_channel_name = origin->get_channel();
@@ -591,7 +591,7 @@ void server::send_request(connected_client *origin, std::string &message) {
 }
 
 /* Tries changing the nickname of a certain client. */
-void server::nickname_request(connected_client *origin, std::string &nickname) {
+void server::nickname_request(connected_client *origin, const std::string &nickname) {
 
     // Checks if the nickname doesn't exist on the server.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -613,7 +613,7 @@ void server::nickname_request(connected_client *origin, std::string &nickname) {
 }
 
 /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
-void server::join_request(connected_client *origin, std::string &channel_name) {
+void server::join_request(connected_client *origin, const std::string &channel_name) {
 
     // Checks for an invalid channel name, and sends a warning to the client.
     if(!channel::is_valid_channel_name(channel_name)) {
@@ -668,7 +668,7 @@ void server::join_request(connected_client *origin, std::string &channel_name) {
 }
 
 /* Tries kicking a client that must be in the same channel. */
-void server::kick_request(connected_client *origin, std::string &nickname) {
+void server::kick_request(connected_client *origin, const std::string &nickname) {
 
     // Gets a reference to the target client that will be kicked.
     connected_client *target = this->get_client_ref(nickname);
@@ -692,7 +692,7 @@ void server::kick_request(connected_client *origin, std::string &nickname) {
 }
 
 /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
-void server::toggle_mute_request(connected_client *origin, std::string &nickname, bool muted) {
+void server::toggle_mute_request(connected_client *origin, const std::string &nickname, bool muted) {
 
     // Gets a reference to the target client that will have it's ip sent.
     connected_client *target_client = this->get_client_ref(nickname);
@@ -767,7 +767,7 @@ void server::toggle_mute_request(connected_client *origin, std::string &nickname
 }
 
 /* Tries finding and showing the IP of a client a player that must be in the same channel. */
-void server::whois_request(connected_client *origin, std::string &nickname) {
+void server::whois_request(connected_client *origin, const std::string &nickname) {
     
     // Gets a reference to the target client that will have it's ip sent.
     connected_client *target = this->get_client_ref(nickname);
