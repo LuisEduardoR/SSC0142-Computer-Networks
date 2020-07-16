@@ -36,7 +36,7 @@
 // Constructors/destructors =====================================================================================================================================
 // ==============================================================================================================================================================
 
-connected_client::connected_client(int socket, server *server_instance) {
+connected_client::connected_client(int socket, server *const server_instance) {
 
     this->atmc_kill = false;
     this->client_socket = socket;

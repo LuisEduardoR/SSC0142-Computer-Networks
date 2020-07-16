@@ -130,22 +130,22 @@ class server
         // ==============================================================================================================================================================
 
         /* Sends a message from a client to other clients on it's channel. */
-        void send_request(connected_client *origin, const std::string &message);
+        void send_request(connected_client *const origin, const std::string &message);
 
         /* Tries changing the nickname of a certain client. */
-        void nickname_request(connected_client *origin, const std::string &nickname);
+        void nickname_request(connected_client *const origin, const std::string &nickname);
 
         /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
-        void join_request(connected_client *origin, const std::string &channel_name);
+        void join_request(connected_client *const origin, const std::string &channel_name);
 
         /* Tries kicking a client that must be in the same channel. */
-        void kick_request(connected_client *origin, const std::string &nickname);
+        void kick_request(connected_client *const origin, const std::string &nickname);
 
         /* Tries mutting/unmutting a client that must be in the same channel and must not already be muted/unmuted. */
-        void toggle_mute_request(connected_client *origin, const std::string &nickname, bool muted);
+        void toggle_mute_request(connected_client *const origin, const std::string &nickname, bool muted);
 
         /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
-        void whois_request(connected_client *origin, const std::string &nickname);
+        void whois_request(connected_client *const origin, const std::string &nickname);
 
 };
 

@@ -16,6 +16,6 @@
 // Sends data to a socket.
 void send_message(int socket, const std::string &message);
 // Tries receiving data from a socket and storing it on a buffer.
-std::string check_message(int socket, int *status, int need_to_acknowledge);
+std::string check_message(int socket, int *const status, int need_to_acknowledge);
 
 # endif
