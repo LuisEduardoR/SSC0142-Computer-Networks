@@ -86,10 +86,10 @@ class connected_client
         bool set_nickname(std::string nickname);
 
         /* Changes the channel this client is connected to. */
-        void set_channel(int channel, int role);
+        void set_channel(std::string &channel_name, int role);
 
         /* Returns the channel this client is connected to. */
-        int get_channel();
+        std::string get_channel();
 
         /* Returns the role of this client on it's channel. */
         int get_role();
@@ -118,7 +118,8 @@ class connected_client
         std::string nickname;
 
         /* Current channel for this client and his respective role. */
-        int current_channel, channel_role;
+        std::string current_channel;
+        int channel_role;
 
         /* Stores the thread that handles listening for this clients conenction. */
         std::thread listening_handle;

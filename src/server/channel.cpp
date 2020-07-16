@@ -18,9 +18,8 @@
 // ==============================================================================================================================================================
 
 // Creates a channel with an index and a name, also passes an instance of the server.
-channel::channel(int index, std::string name, server *server_instance) {
+channel::channel(std::string name, server *server_instance) {
 
-    this->index = index;
     this->name = name;
     this->server_instance = server_instance;
 
@@ -130,12 +129,12 @@ bool channel::toggle_mute_member(int socket, bool muted) {
 /* Checks if a certain client is muted on the server. */
 bool channel::is_muted(int socket) { return (this->muted.find(socket) != this->muted.end()); }
 
+/* Checks if the channel has no members. */
+bool channel::is_empty() { return this->members.empty(); }
+
 // ==============================================================================================================================================================
 // Getters ======================================================================================================================================================
 // ==============================================================================================================================================================
-
-/* Gets this channel's index. */
-int channel::get_index() { return this->index; }
 
 /* Checks if a certain client is the admin of the server. */
 std::string channel::get_name() { return this->name; }

@@ -14,7 +14,7 @@
 # include <iostream>
 # include <string>
 
-# include <vector>
+# include <map>
 # include <queue>
 
 # include <thread>
@@ -101,9 +101,8 @@ server::~server() {
     // Calls check_connections to get rid of the clients.
     this->check_connections();
 
-    // Clears the memory of any remaining channels.
-    for(auto it = this->channels.begin(); it != this->channels.end(); it++)
-        delete (*it);
+    // Calls check_channels to get rid of the channels.
+    this->check_channels();
 
     // Closes the socket.
     close(this->server_socket);
@@ -132,6 +131,9 @@ void server::handle() {
 
         // Checks for any changes in the client connections before processing a new request.
         server::check_connections();
+
+        // Checks for any empty channels that should be removed before processing a new request.
+        server::check_channels();
 
         // Stores if there's currently a request to be processed.
         bool has_request = false;
@@ -278,7 +280,7 @@ void server::t_handle_connections() {
         this->updating_new_clients.unlock();
         // --------------------------------------------------------------------------------------------------------------------------------------------------
 
-        std::cerr << "Client just connected with socket " << new_connection->get_socket() << "!" << std::endl;
+        std::cerr << COLOR_BLUE << "Client just connected with socket " << new_connection->get_socket() << "!" << COLOR_DEFAULT << std::endl;
 
     }
 
@@ -322,12 +324,49 @@ void server::check_connections() {
     // Exits the critical region, and opens the semaphore.
     this->updating_new_clients.unlock();
     // --------------------------------------------------------------------------------------------------------------------------------------------------
+
+}
+
+/* Checks for channels that became empty and can be deleted. */
+void server::check_channels() {
+
+    // Gets each empty channel.
+    while (!this->empty_channels.empty()) {
+
+        // Gets the start of the queue.
+        std::string target_name = this->empty_channels.front();
+        this->empty_channels.pop(); // Removes the name from the queue.
+
+        // Deletes the channel.
+        this->delete_channel(target_name);
+
+    } 
+
 }
 
 // Kills a client that has disconnected from the server, performing any cleanup necessary.
 void server::kill_client(connected_client *connection) {
 
-    // TODO: channel cleanup.
+    // Gets the client's channel.
+    std::string channel_name = connection->get_channel();
+    channel *target_channel = this->get_channel_ref(channel_name);
+
+    // If the client is currently on a channel removes him from that channel.
+    if(target_channel != nullptr) {
+
+        // Removes the client from current channel.
+        target_channel->remove_member(connection->get_socket());
+        std::string no_channel("NONE");
+
+        // Sets the client to being in no channel.
+        connection->set_channel(no_channel, CLIENT_NO_CHANNEL);
+
+        // Adds the channel to the empty list if it became empty.
+        if(target_channel->is_empty()) {
+            std::cerr << "Channel " << target_channel->get_name() << " is empty and will soon be deleted!" << std::endl;
+            this->empty_channels.push(target_channel->get_name());
+        }
+    }
 
     // Deletes the client connection.
     delete connection;
@@ -338,38 +377,52 @@ void server::kill_client(connected_client *connection) {
 // Creates/deletes channels =====================================================================================================================================
 // ==============================================================================================================================================================
 
-bool server::create_channel(std::string name, int admin_socket) {
+bool server::create_channel(std::string &channel_name, int admin_socket) {
 
     // Checks if the channel name is valid.
-    if(!channel::is_valid_channel_name(name))
+    if(!channel::is_valid_channel_name(channel_name))
         return false;
 
     // Creates the channel.
-    channel *new_channel = new channel(this->channels.size(), name, this);
+    channel *new_channel = new channel(channel_name, this);
 
     // Adds the admin to the channel.
     new_channel->add_member(admin_socket);
 
-    // Creates the new channel and adds it to the list.
-    this->channels.push_back(new_channel);
+    // Creates the new channel and adds it to the map.
+    this->channels.insert(std::make_pair(channel_name, new_channel));
 
-    std::cerr << "Channel " << name << " created!" << std::endl;
+    std::cerr << COLOR_BLUE << "Channel " << channel_name << " created!" << COLOR_DEFAULT << std::endl;
 
     return true;
 
 }
 
-// !FIXME: Segmentation fault.
-// TODO: Improve thread safety, currently this function is locked all the times it's called so locking again will cause a deadlock, but it would be better to lock inside the function.
-// Deletes a new channel on this server.
-bool server::delete_channel(int index) {
+/* Deletes an empty channel on this server. */
+bool server::delete_channel(std::string &channel_name) {
 
-    // TODO: currently there's no need to remove users from the channel, as the channel will only be removed when empty, but this should be done here.
-    // Removes the channel.
-    std::string name = this->channels[index]->get_name(); // Gets the name to the log message.
-    this->channels.erase(this->channels.begin() + index);
+    // Gets a reference to the channel.
+    channel *target = this->get_channel_ref(channel_name);
 
-    std::cerr << "Channel " << name << " deleted!" << std::endl;
+    // Checks if the channel being deleted exists.
+    if(target == nullptr) {
+        std::cerr << COLOR_BOLD_RED << "Channel " + channel_name + " doesn't exist!" << COLOR_DEFAULT << std::endl;
+        return false;
+    }
+
+    // Gives an error if the channel is not empty.
+    if(!target->is_empty()) {
+        std::cerr << COLOR_BOLD_RED << "Channel " + channel_name + " is not empty!" << COLOR_DEFAULT << std::endl;
+        return false;
+    }
+
+    // Removes the channel from the map.
+    this->channels.erase(channel_name);
+
+    // Deletes the channel freeing memory.
+    delete target;
+
+    std::cerr << COLOR_YELLOW << "Channel " << channel_name << " deleted!" << COLOR_DEFAULT << std::endl;
 
     return true;
 
@@ -403,24 +456,13 @@ connected_client *server::get_client_ref(std::string &nickname) {
 
 }
 
-/* Returns a reference to a channel with a certain index. */
-channel *server::get_channel_ref(int index) {
-
-    // Gets the channel at a valid index or keeps a nullptr.
-    if((size_t)index > 0 && (size_t)index < this->channels.size())
-        return this->channels[index];
-
-    return nullptr;
-
-}
-
 /* Returns a reference to a channel with a certain name. */
-channel *server::get_channel_ref(std::string &name) {
+channel *server::get_channel_ref(std::string &channel_name) {
 
     // Searches for the channel in the list.
-    for(auto it = this->channels.begin(); it != this->channels.end(); it++)
-        if((*it)->get_name().compare(name) == 0)
-            return (*it);
+    auto it = channels.find(channel_name);
+    if(it != this->channels.end())
+        return (*it).second;
 
     return nullptr;
 
@@ -514,26 +556,21 @@ void server::make_request(connected_client *origin, std::string content) {
 void server::send_request(connected_client *origin, std::string &message) {
 
     // Gets the client's channel.
-    int target_channel_index = origin->get_channel();
+    std::string target_channel_name = origin->get_channel();
+    channel *target_channel = this->get_channel_ref(target_channel_name);
 
     // If the client is not on a valid channel sends an error message.
-    if(target_channel_index < 0) {
+    if(target_channel == nullptr) {
         std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before sending messages!" + COLOR_DEFAULT);
         origin->send(error_msg);
         return;
     }
-
-    // Gets a reference to the client's channel.
-    channel *target_channel = this->get_channel_ref(target_channel_index);
 
     // Checks if the client is not muted.
     if(!target_channel->is_muted(origin->get_socket())) {
 
         // Gets the client's nickname.
         std::string client_name = origin->get_nickname();
-
-        // Gets the channel's name.
-        std::string channel_name = target_channel->get_name();
 
         // Gets the target sockets (channel's members).
         int num_targets;
@@ -544,7 +581,7 @@ void server::send_request(connected_client *origin, std::string &message) {
             // Gets the target client.
             connected_client *target_client = this->get_client_ref(message_targets[i]);
             if(target_client != nullptr) {
-                std::string complete_message = channel_name + " " + client_name + " " + message;
+                std::string complete_message = target_channel_name + " " + client_name + " " + message;
                 target_client->send(complete_message);
             }
         }
@@ -553,7 +590,7 @@ void server::send_request(connected_client *origin, std::string &message) {
         delete[] message_targets;
 
     } else { // Sends a message warning the client that it is muted.
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel!" + COLOR_DEFAULT);
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel " + target_channel_name + "!" + COLOR_DEFAULT);
         origin->send(error_msg);
         return;
     }
@@ -584,9 +621,57 @@ void server::nickname_request(connected_client *origin, std::string &nickname) {
 
 /* Tries joining a channel with a certain name as a certain client, tries creating the channel if it doesn't exist. */
 void server::join_request(connected_client *origin, std::string &channel_name) {
-    // TODO: join request.
-    std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /join request not available...");
-    origin->send(error_msg);
+
+    // Checks for an invalid channel name, and sends a warning to the client.
+    if(!channel::is_valid_channel_name(channel_name)) {
+        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this channel name is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
+        origin->send(error_msg);
+        return;
+    }
+
+    // Gets the client's channel.
+    std::string target_channel_name = origin->get_channel();
+    channel *target_channel = this->get_channel_ref(target_channel_name);
+
+    // If the client is currently on a channel removes him from that channel.
+    if(target_channel != nullptr) {
+
+        // Removes the client from current channel.
+        target_channel->remove_member(origin->get_socket());
+
+        // Sets the client to being in no channel.
+        std::string no_channel("NONE");
+        origin->set_channel(no_channel, CLIENT_NO_CHANNEL);
+
+        // Adds the channel to the empty list if it became empty.
+        if(target_channel->is_empty()) {
+            std::cerr << "Channel " << target_channel->get_name() << " is empty and will soon be deleted!" << std::endl;
+            this->empty_channels.push(target_channel->get_name());
+        }
+
+    }
+
+    // Gets a reference to the channel if it already exists.
+    auto iter = this->channels.find(channel_name);
+    target_channel = nullptr;
+    if(iter != this->channels.end())
+        target_channel = iter->second;
+
+    // If the reference could be obtained the channel already exists, so adds the client.
+    if(target_channel != nullptr) {
+        target_channel->add_member(origin->get_socket()); // Adds the client.
+        origin->set_channel(channel_name, CLIENT_ROLE_NORMAL); // Sets the client channel and role.
+        std::string join_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + "!");
+        origin->send(join_msg);
+        return;
+    }
+
+    // If no reference was found them creates the new channel with the client as an admin.
+    create_channel(channel_name, origin->get_socket()); // Creates the channel.
+    origin->set_channel(channel_name, CLIENT_ROLE_ADMIN); // Sets the client channel and role.
+    std::string join_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + " as an " + COLOR_BOLD_BLUE + "admin" + COLOR_DEFAULT + "!");
+    origin->send(join_msg);
+
 }
 
 /* Tries kicking a client that must be in the same channel. */
@@ -603,7 +688,7 @@ void server::toggle_mute_request(connected_client *origin, std::string &nickname
     origin->send(error_msg);
 }
 
-/* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
+/* Tries finding and showing the IP of a client a player that must be in the same channel. */
 void server::whois_request(connected_client *origin, std::string &nickname) {
     // TODO: whois request only for admins.
     std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " /whois request not available...");

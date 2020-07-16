@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
         // Checks for errors. 
         int svr_status = s->get_status();
         if(svr_status < 0) {
-            std::cerr << COLOR_BOLD_RED << "Error connecting to socket! (" << COLOR_DEFAULT << svr_status << ")" << std::endl << std::endl;
+            std::cerr << COLOR_BOLD_RED << "Error connecting to socket! (" << svr_status << ")" << COLOR_DEFAULT << std::endl << std::endl;
             delete s;
             return svr_status;
         }

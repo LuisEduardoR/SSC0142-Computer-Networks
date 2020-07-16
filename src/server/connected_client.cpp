@@ -48,7 +48,7 @@ connected_client::connected_client(int socket, server *server_instance) {
     this->nickname = "socket " + std::to_string(socket);
 
     // Initially all clients have no channel.
-    this->current_channel = -1;
+    this->current_channel = "NONE";
 
 }
 
@@ -276,13 +276,13 @@ bool connected_client::set_nickname(std::string nickname) {
 }
 
 /* Changes the channel this client is connected to. */
-void connected_client::set_channel(int channel, int role) {
-    this->current_channel = channel;
+void connected_client::set_channel(std::string &channel_name, int role) {
+    this->current_channel = channel_name;
     this->channel_role = role;    
 }
 
 /* Returns the channel this client is connected to. */
-int connected_client::get_channel() {
+std::string connected_client::get_channel() {
     return this->current_channel;
 }
 

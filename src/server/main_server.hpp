@@ -10,7 +10,7 @@
 # include "request.hpp"
 # include "connected_client.hpp"
 
-# include <vector>
+# include <map>
 # include <queue>
 
 # include <thread>
@@ -77,7 +77,9 @@ class server
         std::set<connected_client*> clients;
 
         // Used to store the server's current channels.
-        std::vector<channel*> channels;
+        std::map<std::string, channel*> channels;
+        // Used to store the name of channels that became empty and need to be removed.
+        std::queue<std::string> empty_channels;
 
         // Used to store requests that need to be executed by the server.
         std::queue<request> request_queue;
@@ -94,6 +96,9 @@ class server
         /* Checks for changes in client connections. Adding or removing them if necessary. */
         void check_connections();
 
+        /* Checks for channels that became empty and can be deleted. */
+        void check_channels();
+
         /* Removes the client with the given socket from the server. */
         void kill_client(connected_client *connection);
 
@@ -102,10 +107,10 @@ class server
         // ==============================================================================================================================================================
         
         // Creates a new channel on this server.
-        bool create_channel(std::string name, int admin_socket);
+        bool create_channel(std::string &channel_name, int admin_socket);
 
-        // Deletes a new channel on this server.
-        bool delete_channel(int index);
+        /* Deletes an empty channel on this server. */
+        bool delete_channel(std::string &channel_name);
 
         // ==============================================================================================================================================================
         // Getters ======================================================================================================================================================
@@ -117,11 +122,8 @@ class server
         /* Returns a reference to a client with a certain nickname. */
         connected_client *get_client_ref(std::string &nickname);
 
-        /* Returns a reference to a channel with a certain index. */
-        channel *get_channel_ref(int index);
-
         /* Returns a reference to a channel with a certain name. */
-        channel *get_channel_ref(std::string &name);
+        channel *get_channel_ref(std::string &channel_name);
 
         // ==============================================================================================================================================================
         // Requests =====================================================================================================================================================
@@ -144,7 +146,6 @@ class server
 
         /* Tries finding and showing the IP of a cçient a player that must be in the same channel. */
         void whois_request(connected_client *origin, std::string &nickname);
-
 
 };
 
