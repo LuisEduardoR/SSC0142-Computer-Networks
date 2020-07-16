@@ -459,7 +459,7 @@ channel *server::get_channel_ref(const std::string &channel_name) {
     // Searches for the channel in the list.
     auto iter = channels.find(channel_name);
     if(iter != this->channels.end())
-        return &(*iter).second;
+        return &(iter->second);
 
     return nullptr;
 

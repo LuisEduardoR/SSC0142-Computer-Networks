@@ -231,7 +231,7 @@ void connected_client::t_handle_sending() {
 // ==============================================================================================================================================================
 
 /* Adds a new message to queue to be sent to this client. */
-void connected_client::send(std::string &message) {
+void connected_client::send(const std::string &message) {
 
     // --------------------------------------------------------------------------------------------------------------------------------------------------
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
@@ -253,12 +253,12 @@ void connected_client::send(std::string &message) {
 
 /* Returns this client's nickname (doesn't use a lock, because socket is supposed to never change after being 
 assigned by the constructor). */
-int connected_client::get_socket() {
+int connected_client::get_socket() const {
     return this->client_socket;
 }
 
 /* Returns this client's nickname. */
-std::string connected_client::get_nickname() {
+std::string connected_client::get_nickname() const {
     return this->nickname;
 }
 
@@ -293,17 +293,17 @@ void connected_client::set_channel(const std::string &channel_name, int role) {
 }
 
 /* Returns the channel this client is connected to. */
-std::string connected_client::get_channel() {
+std::string connected_client::get_channel() const {
     return this->current_channel;
 }
 
 /* Returns the role of this client on it's channel. */
-int connected_client::get_role() {
+int connected_client::get_role() const {
     return this->channel_role;
 }
 
 /* Returns the ip of this client as a string. */
-std::string connected_client::get_ip() {
+std::string connected_client::get_ip() const {
     
     // Gets the client network address information.
     struct sockaddr_in sa;

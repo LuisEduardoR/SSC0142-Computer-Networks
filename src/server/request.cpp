@@ -31,8 +31,8 @@ request::request(int origin_socket, request_type r_type, const std::string data)
 // Getters ======================================================================================================================================================
 // ==============================================================================================================================================================
 
-int request::get_origin_socket() { return this->origin_socket; }
+int request::get_origin_socket() const { return this->origin_socket; }
 
-request_type request::get_type() { return this->r_type; }
+request_type request::get_type() const { return this->r_type; }
 
-std::string request::get_data() { return this->data; }
+std::string request::get_data() const { return this->data; }

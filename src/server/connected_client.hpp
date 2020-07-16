@@ -70,17 +70,17 @@ class connected_client
         // ==============================================================================================================================================================
 
         /* Adds a new message to queue to be sent to this client. */
-        void send(std::string &message);
+        void send(const std::string &message);
 
         // ==============================================================================================================================================================
         // Getters/setters ==============================================================================================================================================
         // ==============================================================================================================================================================
 
         /* Returns this client's nickname. */
-        int get_socket();
+        int get_socket() const;
 
         /* Returns this client's nickname. */
-        std::string get_nickname();
+        std::string get_nickname() const;
 
         /* Tries updating the player nickname. */
         bool set_nickname(const std::string &nickname);
@@ -89,13 +89,13 @@ class connected_client
         void set_channel(const std::string &channel_name, int role);
 
         /* Returns the channel this client is connected to. */
-        std::string get_channel();
+        std::string get_channel() const;
 
         /* Returns the role of this client on it's channel. */
-        int get_role();
+        int get_role() const;
 
         /* Returns the ip of this client as a string. */
-        std::string get_ip();
+        std::string get_ip() const;
 
     private:
 

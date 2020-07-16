@@ -54,20 +54,20 @@ class channel
         bool toggle_mute_member(int socket, bool muted);
 
         /* Checks if a certain client is muted on the server. */
-        bool is_muted(int socket);
+        bool is_muted(int socket) const;
 
         /* Checks if the channel has no members. */
-        bool is_empty();
+        bool is_empty() const;
 
         // ==============================================================================================================================================================
         // Getters ======================================================================================================================================================
         // ==============================================================================================================================================================
 
         /* Checks if a certain client is the admin of the server. */
-        std::string get_name();
+        std::string get_name() const;
 
         /* Gets an array of this channel's members sockets. */
-        std::vector<int> get_members();
+        std::vector<int> get_members() const;
 
     private:
 

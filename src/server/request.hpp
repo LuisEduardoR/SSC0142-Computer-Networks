@@ -27,13 +27,13 @@ class request
         // ==============================================================================================================================================================
 
         // Getter for the origin socket.
-        int get_origin_socket();
+        int get_origin_socket() const;
 
         // Getter for the request type.
-        request_type get_type();
+        request_type get_type() const;
 
         // Getter for the data.
-        std::string get_data();
+        std::string get_data() const;
 
     private:
 

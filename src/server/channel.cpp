@@ -121,20 +121,20 @@ bool channel::toggle_mute_member(int socket, bool muted) {
 }
 
 /* Checks if a certain client is muted on the server. */
-bool channel::is_muted(int socket) { return (this->muted.find(socket) != this->muted.end()); }
+bool channel::is_muted(int socket) const { return (this->muted.find(socket) != this->muted.end()); }
 
 /* Checks if the channel has no members. */
-bool channel::is_empty() { return this->members.empty(); }
+bool channel::is_empty() const { return this->members.empty(); }
 
 // ==============================================================================================================================================================
 // Getters ======================================================================================================================================================
 // ==============================================================================================================================================================
 
 /* Checks if a certain client is the admin of the server. */
-std::string channel::get_name() { return this->name; }
+std::string channel::get_name() const { return this->name; }
 
 /* Gets an array of this channel's members sockets. */
-std::vector<int> channel::get_members() {
+std::vector<int> channel::get_members() const {
 
     // Converts the members set to a vector and returns it.
     return std::vector<int>(this->members.begin(), this->members.end());
