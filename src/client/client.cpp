@@ -30,8 +30,16 @@
 
 #include <unistd.h>
 
+// ==============================================================================================================================================================
+// Globals ======================================================================================================================================================
+// ==============================================================================================================================================================
+
 // Used to indicate when the client should be closed.
 std::atomic_bool atmc_close_client_flag(false);
+
+// ==============================================================================================================================================================
+// Signals ======================================================================================================================================================
+// ==============================================================================================================================================================
 
 // Used to make the client don't close on a CTRL + C;
 void ignore_sigint(int signal_num) {
@@ -42,8 +50,12 @@ void ignore_sigint(int signal_num) {
 
 }
 
-// CONSTRUCTOR
-client::client() { 
+// ==============================================================================================================================================================
+// Constructors/destructors =====================================================================================================================================
+// ==============================================================================================================================================================
+
+/* Creates a new client and tries connecting to a server. */
+client::client(const char *s_addr, int port_number) { 
 
     // Creates a TCP socket.
     this->network_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -51,30 +63,30 @@ client::client() {
     // Doesn't show admin commands at start.
     this->atmc_show_admin_commands = false;
 
-}
-
-// DESTRUCTOR
-client::~client() {
-
-    // Closes the socket.
-    close(this->network_socket);
-}
-
-// Tries connecting to a server and returns the connection status.
-int client::connect_to_server(const char *s_addr, int port_number){
-
     // Gets an address for the socket.
     this->server_address.sin_family = AF_INET;
     this->server_address.sin_port = htons(port_number);
     inet_pton(AF_INET,  s_addr, &(this->server_address.sin_addr));
 
     // Connects to the server.
-    this->connection_status = connect(this->network_socket, (struct sockaddr *) &(this->server_address), sizeof(this->server_address));
-
-    // Returns the status of the connection.
-    return this->connection_status;
+    this->client_status= connect(this->network_socket, (struct sockaddr *) &(this->server_address), sizeof(this->server_address));
 
 }
+
+/* Closes the socket on the destructor. */
+client::~client() {
+
+    // Closes the socket.
+    close(this->network_socket);
+}
+
+// ==============================================================================================================================================================
+// Client =======================================================================================================================================================
+// ==============================================================================================================================================================
+
+/* Returns the status of the client */
+int client::get_status() { return this->client_status; }
+
 
 // Handles the client instance (control of the program is given to the client until it disconnects).
 void client::handle() {
@@ -158,7 +170,7 @@ void client::handle() {
         }
 
         // Checks for the /ack command and ignores it, as it can't be sent directly by the user.
-        if(command_buffer.compare(ACKNOWLEDGE_MESSAGE) == 0)
+        if(command_buffer.compare(acknowledge_message) == 0)
             continue;
 
         // Sends all other messages to the server.

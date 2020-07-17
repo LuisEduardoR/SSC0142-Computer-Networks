@@ -9,9 +9,10 @@
 # include <string>
 
 // The maximum number of bytes that can be sent or received at once.
-# define MAX_BLOCK_SIZE 4096
+constexpr size_t max_block_size = 4096;
+
 // The message used to acknowledge data was received.
-# define ACKNOWLEDGE_MESSAGE "/ack"
+constexpr char acknowledge_message[] = "/ack";
 
 // Sends data to a socket.
 void send_message(int socket, const std::string &message);

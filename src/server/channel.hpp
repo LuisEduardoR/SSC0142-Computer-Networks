@@ -14,7 +14,7 @@
 # include <atomic>
 
 // Max size of a channel name.
-# define MAX_CHANNEL_NAME_SIZE 200
+constexpr size_t max_channel_name_size = 200;
 
 // Headers for classes in other files that will be used bellow.
 class server;

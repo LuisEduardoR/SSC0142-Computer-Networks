@@ -20,7 +20,7 @@
 # include <netinet/in.h>
 
 // Max connections backlog
-# define BACKLOG_LEN 8
+constexpr size_t backlog_length = 8;
 
 // Headers for classes in other files that will be used bellow.
 class channel;

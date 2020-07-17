@@ -53,6 +53,7 @@
         "thread": "cpp",
         "typeinfo": "cpp",
         "queue": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "cstring": "cpp"
     }
 }

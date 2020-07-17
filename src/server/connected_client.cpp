@@ -36,12 +36,10 @@
 // Constructors/destructors =====================================================================================================================================
 // ==============================================================================================================================================================
 
-connected_client::connected_client(int socket, server *const server_instance) {
+connected_client::connected_client(int socket, server *const server_instance) : server_instance(server_instance), client_socket(socket) {
 
+    // Initializes the atomics.
     this->atmc_kill = false;
-    this->client_socket = socket;
-
-    this->server_instance = server_instance;
     this->atmc_ack_received_message = 0;
 
     // Initially the nickname comes from the client socket.
@@ -71,7 +69,7 @@ connected_client::~connected_client() {
 bool connected_client::is_valid_nickname(const std::string &nickname) {
 
     // Checks if the nickname has an invalid size.
-    if(nickname.empty() || nickname.length() > MAX_NICKNAME_SIZE) // Checks for valid size.
+    if(nickname.empty() || nickname.length() > max_nickname_size) // Checks for valid size.
         return false;
 
     // Checks for invalid stater characters.
@@ -122,7 +120,7 @@ void connected_client::t_handle_listening()  {
 
                 // ! Checks for requests that can be handled immediately, some of those are really important to be done as soon as possible like /ack, others
                 // ! like /ping are done this way simple because it's possible and the request is not worth enough to waste the server's time.
-                if(new_message.compare(ACKNOWLEDGE_MESSAGE) == 0) // Marks that the client has acknowledge a message (done here to avoid delays on the queue).       
+                if(new_message.compare(acknowledge_message) == 0) // Marks that the client has acknowledge a message (done here to avoid delays on the queue).       
                     this->atmc_ack_received_message--;
                 else if(new_message.compare("/ping") == 0) { // Sends a "pong" back to the client (done here to avoid delays on the queue).       
                     std::string ping_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " pong";
@@ -179,7 +177,7 @@ void connected_client::t_handle_sending() {
             continue; 
 
         // Marks how many attempts are left for a client to receive and acknowledge this message.
-        int attempts = MAX_RESENDING_ATTEMPS;
+        unsigned attempts = max_resending_attempts;
 
         // Marks that this clients needs to acknowledges that a message has being received.
         this->atmc_ack_received_message++;
@@ -199,9 +197,9 @@ void connected_client::t_handle_sending() {
             diff = current_time - start_time;
 
             // Checks if it's time to ressend the message or if it's the first attempt..
-            if(diff.count() > ACKNOWLEDGE_WAIT_TIME || attempts == MAX_RESENDING_ATTEMPS) {
+            if(diff.count() > acknowledge_wait_time || attempts == max_resending_attempts) {
 
-                if(attempts < MAX_RESENDING_ATTEMPS) // If the message failed to be sent and this is a retry prints a message.
+                if(attempts < max_resending_attempts) // If the message failed to be sent and this is a retry prints a message.
                     std::cerr << COLOR_BOLD_YELLOW << "Client with socket " << std::to_string(this->client_socket) << " failed to acknowledge message! (" << std::to_string(attempts) << " remaining)" << COLOR_DEFAULT << std::endl;
 
                 // Attempt to send the message.
@@ -276,13 +274,13 @@ bool connected_client::set_nickname(const std::string &nickname) {
 }
 
 /* Changes the channel this client is connected to. */
-void connected_client::set_channel(const std::string &channel_name, int role) {
+void connected_client::set_channel(const std::string &channel_name, client_role role) {
 
     this->current_channel = channel_name;
     this->channel_role = role;    
 
     // Sends a message to the client to enable or disable the admin commands.
-    if(role == CLIENT_ROLE_ADMIN) { // Activates showing admin commands.
+    if(role == cr_Admin) { // Activates showing admin commands.
         std::string admin_on_msg = "/show_admin_commands";
         this->send(admin_on_msg);
     } else {
@@ -298,7 +296,7 @@ std::string connected_client::get_channel() const {
 }
 
 /* Returns the role of this client on it's channel. */
-int connected_client::get_role() const {
+client_role connected_client::get_role() const {
     return this->channel_role;
 }
 

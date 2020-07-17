@@ -18,18 +18,14 @@
 # include <netinet/in.h>
 
 // Max size of a connect client's nickname.
-# define MAX_NICKNAME_SIZE 50
+constexpr size_t max_nickname_size = 50;
 // Amount of times the server will try resending a message to a connected client.
-# define MAX_RESENDING_ATTEMPS 5
+constexpr unsigned max_resending_attempts = 5;
 // Amount of time the server will wait before an attempt to send a message to a connected client fails (in seconds).
-# define ACKNOWLEDGE_WAIT_TIME 0.400
+constexpr float acknowledge_wait_time = 0.400;
 
-// Client has no channel.
-# define CLIENT_NO_CHANNEL -1
-// Client has a normal role in his current channel.
-# define CLIENT_ROLE_NORMAL 0
-// Client has an admin role in his current channel.
-# define CLIENT_ROLE_ADMIN 1
+// Possible role for the connected client.
+enum client_role { cr_No_channel, cr_Normal, cr_Admin };
 
 // Headers for classes in other files that will be used bellow.
 class server;
@@ -44,7 +40,7 @@ class connected_client
         // Constructors/destructors =====================================================================================================================================
         // ==============================================================================================================================================================
 
-        connected_client(int socket, server *const server_instance);
+        connected_client(const int socket, server *const server_instance);
         ~connected_client();
 
         // ==============================================================================================================================================================
@@ -92,13 +88,13 @@ class connected_client
         bool set_nickname(const std::string &nickname);
 
         /* Changes the channel this client is connected to. */
-        void set_channel(const std::string &channel_name, int role);
+        void set_channel(const std::string &channel_name, client_role role);
 
         /* Returns the channel this client is connected to. */
         std::string get_channel() const;
 
         /* Returns the role of this client on it's channel. */
-        int get_role() const;
+        client_role get_role() const;
 
         /* Returns the ip of this client as a string. */
         std::string get_ip() const;
@@ -110,10 +106,10 @@ class connected_client
         // ==============================================================================================================================================================
 
         /* Stores an instance to the server this client is connected to. */
-        server *server_instance;
+        server *const server_instance;
 
         /* This client's socket. */
-        int client_socket;
+        const int client_socket;
 
         // Used to store messages that need to be send to this client.
         std::queue<std::string> message_queue;
@@ -125,7 +121,7 @@ class connected_client
 
         /* Current channel for this client and his respective role. */
         std::string current_channel;
-        int channel_role;
+        client_role channel_role;
 
         /* Stores the thread that handles listening for this clients conenction. */
         std::thread listening_handle;

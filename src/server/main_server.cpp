@@ -193,25 +193,25 @@ void server::handle() {
                 break;
 
             case rt_Admin_kick:
-                if(origin->get_role() == CLIENT_ROLE_ADMIN)
+                if(origin->get_role() == cr_Admin)
                     this->kick_request(origin, data);
                 else admin_failed = true;
                 break;
 
             case rt_Admin_mute:
-                if(origin->get_role() == CLIENT_ROLE_ADMIN)
+                if(origin->get_role() == cr_Admin)
                     this->toggle_mute_request(origin, data, true);
                 else admin_failed = true;
                 break;
 
             case rt_Admin_unmute:
-                if(origin->get_role() == CLIENT_ROLE_ADMIN)
+                if(origin->get_role() == cr_Admin)
                     this->toggle_mute_request(origin, data, false);
                 else admin_failed = true;
                 break;
 
             case rt_Admin_whois:
-                if(origin->get_role() == CLIENT_ROLE_ADMIN)
+                if(origin->get_role() == cr_Admin)
                     this->whois_request(origin, data);
                 else admin_failed = true;
                 break;
@@ -241,7 +241,7 @@ void server::t_handle_connections() {
     while(!atmc_close_server_flag) {
 
         // Listens for a new connection.
-        listen(this->server_socket, BACKLOG_LEN);
+        listen(this->server_socket, backlog_length);
 
         // Accepts the connection and returns the client socket.
         int new_client_socket = accept(this->server_socket, nullptr, nullptr);
@@ -356,7 +356,7 @@ void server::kill_client(connected_client *connection) {
         target_channel->remove_member(connection->get_socket());
 
         // Sets the client to being in no channel.
-        connection->set_channel("NONE", CLIENT_NO_CHANNEL);
+        connection->set_channel("NONE", cr_No_channel);
 
         // Adds the channel to the empty list if it became empty.
         if(target_channel->is_empty()) {
@@ -621,7 +621,7 @@ void server::join_request(connected_client *const origin, const std::string &cha
         target_channel->remove_member(origin->get_socket());
 
         // Sets the client to being in no channel.
-        origin->set_channel("NONE", CLIENT_NO_CHANNEL);
+        origin->set_channel("NONE", cr_No_channel);
 
         // Adds the channel to the empty list if it became empty.
         if(target_channel->is_empty()) {
@@ -640,14 +640,14 @@ void server::join_request(connected_client *const origin, const std::string &cha
     // If the reference could be obtained the channel already exists, so adds the client.
     if(target_channel != nullptr) {
         target_channel->add_member(origin->get_socket()); // Adds the client.
-        origin->set_channel(channel_name, CLIENT_ROLE_NORMAL); // Sets the client channel and role.
+        origin->set_channel(channel_name, cr_Normal); // Sets the client channel and role.
         origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + "!");
         return;
     }
 
     // If no reference was found them creates the new channel with the client as an admin.
     create_channel(channel_name, origin->get_socket()); // Creates the channel.
-    origin->set_channel(channel_name, CLIENT_ROLE_ADMIN); // Sets the client channel and role.
+    origin->set_channel(channel_name, cr_Admin); // Sets the client channel and role.
     origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + " as an " + COLOR_BOLD_BLUE + "admin" + COLOR_DEFAULT + "!");
 
 }

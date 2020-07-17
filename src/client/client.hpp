@@ -20,13 +20,22 @@ class client
 
     public: 
 
-        // CONSTRUCTOR
-        client();
-        // DESTRUCTOR
+        // ==============================================================================================================================================================
+        // Constructors/destructors =====================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Creates a new client and tries connecting to a server. */
+        client(const char *s_addr, int port_number);
+
+        /* Closes the socket on the destructor. */
         ~client();
 
-        // Tries connecting to a server and returns the connection status.
-        int connect_to_server(const char *s_addr, int port_number);
+        // ==============================================================================================================================================================
+        // Client =======================================================================================================================================================
+        // ==============================================================================================================================================================
+
+        /* Returns the status of the client */
+        int get_status();
 
         // Handles the client instance (control of the program is given to the client until it disconnects).
         void handle();
@@ -39,10 +48,16 @@ class client
 
     private:
 
-        struct sockaddr_in server_address;
-        int connection_status;
+        // ==============================================================================================================================================================
+        // Variables ====================================================================================================================================================
+        // ==============================================================================================================================================================
 
+        /* Used to store information about the client socket and address. */
         int network_socket;
+        struct sockaddr_in server_address;
+
+        /* Stores the status of the server */
+        int client_status;
 
         std::mutex updating_messages;
         std::queue<std::string> new_messages;
