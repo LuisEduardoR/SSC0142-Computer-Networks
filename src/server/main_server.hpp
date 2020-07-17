@@ -19,7 +19,8 @@
 # include <arpa/inet.h>
 # include <netinet/in.h>
 
-# define BACKLOG_LEN 8 // Max connections backlog
+// Max connections backlog
+# define BACKLOG_LEN 8
 
 // Headers for classes in other files that will be used bellow.
 class channel;

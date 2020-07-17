@@ -3,11 +3,11 @@
 // João Pedro Uchôa Cavalcante - NUSP 10801169
 // Luís Eduardo Rozante de Freitas Pereira - NUSP 10734794
 
-# include "../color.hpp"
+# include "connected_client.hpp"
 
 # include "main_server.hpp"
-# include "connected_client.hpp"
-# include "../messaging/messaging.hpp"
+# include "../color.hpp"
+# include "../messaging.hpp"
 
 # include <iostream>
 # include <string>

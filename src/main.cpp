@@ -5,15 +5,16 @@
 
 # include "color.hpp"
 
+# include "messaging.hpp"
 # include "client/client.hpp"
 # include "server/main_server.hpp"
-# include "messaging/messaging.hpp"
 
 # include <iostream>
 # include <string>
 
-// Default values.
+// Default address value.
 # define DEFAULT_ADDR "127.0.0.1"
+// Default port value.
 # define DEFAULT_PORT 9002
 
 // Help texts.

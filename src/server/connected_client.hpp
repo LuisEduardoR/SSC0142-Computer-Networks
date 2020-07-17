@@ -17,13 +17,19 @@
 
 # include <netinet/in.h>
 
-# define MAX_NICKNAME_SIZE 50 // Max size of a connect client's nickname.
-# define MAX_RESENDING_ATTEMPS 5 // Amount of times the server will try resending a message to a connected client.
-# define ACKNOWLEDGE_WAIT_TIME 0.400 // Amount of time the server will wait before an attempt to send a message to a connected client fails (in seconds).
+// Max size of a connect client's nickname.
+# define MAX_NICKNAME_SIZE 50
+// Amount of times the server will try resending a message to a connected client.
+# define MAX_RESENDING_ATTEMPS 5
+// Amount of time the server will wait before an attempt to send a message to a connected client fails (in seconds).
+# define ACKNOWLEDGE_WAIT_TIME 0.400
 
-# define CLIENT_NO_CHANNEL -1 // Client has no channel.
-# define CLIENT_ROLE_NORMAL 0 // Client has a normal role in his current channel.
-# define CLIENT_ROLE_ADMIN 1 // Client has an admin role in his current channel.
+// Client has no channel.
+# define CLIENT_NO_CHANNEL -1
+// Client has a normal role in his current channel.
+# define CLIENT_ROLE_NORMAL 0
+// Client has an admin role in his current channel.
+# define CLIENT_ROLE_ADMIN 1
 
 // Headers for classes in other files that will be used bellow.
 class server;

@@ -6,10 +6,11 @@
 # include "../color.hpp"
 
 # include "main_server.hpp"
+
 # include "channel.hpp"
 # include "request.hpp"
 # include "connected_client.hpp"
-# include "../messaging/messaging.hpp"
+# include "../messaging.hpp"
 
 # include <iostream>
 # include <string>
@@ -219,10 +220,8 @@ void server::handle() {
                 break;
         }
 
-        if(admin_failed) { // Sends a warning to the client that a request failed because it's not an admin.
-            std::string error_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you must be an admin to do that!";
-            origin->send(error_msg);
-        }
+        if(admin_failed) // Sends a warning to the client that a request failed because it's not an admin.
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you must be an admin to do that!");
         
     }
 
@@ -348,18 +347,16 @@ void server::check_channels() {
 void server::kill_client(connected_client *connection) {
 
     // Gets the client's channel.
-    std::string channel_name = connection->get_channel();
-    channel *target_channel = this->get_channel_ref(channel_name);
+    channel *target_channel = this->get_channel_ref(connection->get_channel());
 
     // If the client is currently on a channel removes him from that channel.
     if(target_channel != nullptr) {
 
         // Removes the client from current channel.
         target_channel->remove_member(connection->get_socket());
-        std::string no_channel("NONE");
 
         // Sets the client to being in no channel.
-        connection->set_channel(no_channel, CLIENT_NO_CHANNEL);
+        connection->set_channel("NONE", CLIENT_NO_CHANNEL);
 
         // Adds the channel to the empty list if it became empty.
         if(target_channel->is_empty()) {
@@ -512,8 +509,7 @@ void server::make_request(connected_client *const origin, const std::string &con
 
         // If the request type is invalid sends a warning back to the client and ignores it.
         if(r_type == rt_Invalid) {
-            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " invalid command or command parameters!");
-            origin->send(error_msg);
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " invalid command or command parameters!");
             return;
         }
 
@@ -558,8 +554,7 @@ void server::send_request(connected_client *const origin, const std::string &mes
 
     // If the client is not on a valid channel sends an error message.
     if(target_channel == nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before sending messages!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before sending messages!" + COLOR_DEFAULT);
         return;
     }
 
@@ -583,8 +578,7 @@ void server::send_request(connected_client *const origin, const std::string &mes
         }
 
     } else { // Sends a message warning the client that it is muted.
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel " + target_channel_name + "!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are currently muted on the channel " + target_channel_name + "!" + COLOR_DEFAULT);
         return;
     }
 
@@ -596,19 +590,15 @@ void server::nickname_request(connected_client *const origin, const std::string 
     // Checks if the nickname doesn't exist on the server.
     // Waits for the semaphore if necessary, and enters the critical region, closing the semaphore.
     if(this->get_client_ref(nickname) != nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname already exists!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname already exists!" + COLOR_DEFAULT);
         return;
     }
 
     // Tries updating the nickname and sends a message to the client telling the results.
-    if(origin->set_nickname(nickname)) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " your nickname was changed to " + nickname + "!");
-        origin->send(error_msg);
-    } else {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
-        origin->send(error_msg);
-    }
+    if(origin->set_nickname(nickname))
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " your nickname was changed to " + nickname + "!");
+    else
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " this nickname is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
 
 }
 
@@ -617,14 +607,12 @@ void server::join_request(connected_client *const origin, const std::string &cha
 
     // Checks for an invalid channel name, and sends a warning to the client.
     if(!channel::is_valid_channel_name(channel_name)) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " this channel name is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " this channel name is invalid! (It can't start with '#' or '&' and must not contain spaces or commas)" + COLOR_DEFAULT);
         return;
     }
 
     // Gets the client's channel.
-    std::string target_channel_name = origin->get_channel();
-    channel *target_channel = this->get_channel_ref(target_channel_name);
+    channel *target_channel = this->get_channel_ref(origin->get_channel());
 
     // If the client is currently on a channel removes him from that channel.
     if(target_channel != nullptr) {
@@ -633,8 +621,7 @@ void server::join_request(connected_client *const origin, const std::string &cha
         target_channel->remove_member(origin->get_socket());
 
         // Sets the client to being in no channel.
-        std::string no_channel("NONE");
-        origin->set_channel(no_channel, CLIENT_NO_CHANNEL);
+        origin->set_channel("NONE", CLIENT_NO_CHANNEL);
 
         // Adds the channel to the empty list if it became empty.
         if(target_channel->is_empty()) {
@@ -654,16 +641,14 @@ void server::join_request(connected_client *const origin, const std::string &cha
     if(target_channel != nullptr) {
         target_channel->add_member(origin->get_socket()); // Adds the client.
         origin->set_channel(channel_name, CLIENT_ROLE_NORMAL); // Sets the client channel and role.
-        std::string join_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + "!");
-        origin->send(join_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + "!");
         return;
     }
 
     // If no reference was found them creates the new channel with the client as an admin.
     create_channel(channel_name, origin->get_socket()); // Creates the channel.
     origin->set_channel(channel_name, CLIENT_ROLE_ADMIN); // Sets the client channel and role.
-    std::string join_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + " as an " + COLOR_BOLD_BLUE + "admin" + COLOR_DEFAULT + "!");
-    origin->send(join_msg);
+    origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you're now on channel " + channel_name + " as an " + COLOR_BOLD_BLUE + "admin" + COLOR_DEFAULT + "!");
 
 }
 
@@ -677,8 +662,7 @@ void server::kick_request(connected_client *const origin, const std::string &nic
 
     // Checks if the target client exists and sends an error message if it does not.
     if(target == nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
         return;
     }
 
@@ -686,8 +670,7 @@ void server::kick_request(connected_client *const origin, const std::string &nic
     shutdown(target->get_socket(), SHUT_RDWR);
 
     // Sends a message telling the admin that the client was kicked.
-    std::string kick_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" kicked!");
-    origin->send(kick_msg);
+    origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" kicked!");
 
 }
 
@@ -699,26 +682,22 @@ void server::toggle_mute_request(connected_client *const origin, const std::stri
 
     // Checks if the target client exists and sends an error message if it does not.
     if(target_client == nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
         return;
     }
 
     // Gets a reference to the target channel in which the admin is.
-    std::string target_channel_name = origin->get_channel();
-    channel *target_channel = this->get_channel_ref(target_channel_name);
+    channel *target_channel = this->get_channel_ref(origin->get_channel());
 
     // If the admin is not on a valid channel sends an error message.
     if(target_channel == nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before doing this!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " you need to join a channel before doing this!" + COLOR_DEFAULT);
         return;
     }
 
     // Ensures admin and client are in the same channel, sends an error message if they are not.
     if(origin->get_channel().compare(target_client->get_channel()) != 0) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
         return;
     }   
 
@@ -729,38 +708,24 @@ void server::toggle_mute_request(connected_client *const origin, const std::stri
     if(muted) {
 
         // Sends success message.
-        if(success) {
-            
+        if(success) {        
             // Sends message to the admin.            
-            std::string mute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is now muted!";
-            origin->send(mute_msg);
-
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is now muted!");
             // Sends message to the target.
-            mute_msg = COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are now muted on the current channel!" + COLOR_DEFAULT;
-            target_client->send(mute_msg);
-
-        } else { // Sends error message.
-            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
-            origin->send(error_msg);
-        }
+            target_client->send(COLOR_MAGENTA + "server:" + COLOR_YELLOW + " you are now muted on the current channel!" + COLOR_DEFAULT);
+        } else // Sends an error message to the admin.
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
 
     } else {
 
         // Sends success message.
         if(success) {
-
             // Sends message to the admin.            
-            std::string unmute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is no longer muted!";
-            origin->send(unmute_msg);
-
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " \"" + nickname + "\" is no longer muted!");
             // Sends message to the target.
-            unmute_msg = COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you are no longer muted on the current channel!";
-            target_client->send(unmute_msg);
-            
-        } else { // Sends error message.
-            std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
-            origin->send(error_msg);
-        }
+            target_client->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " you are no longer muted on the current channel!");         
+        } else // Sends an error message to the admin.
+            origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " \"" + nickname + "\" is not currently muted!" + COLOR_DEFAULT);
 
     }
 
@@ -774,20 +739,17 @@ void server::whois_request(connected_client *const origin, const std::string &ni
 
     // Checks if the target client exists and sends an error message if it does not.
     if(target == nullptr) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " could not find client with nickname \"" + nickname + "\"!" + COLOR_DEFAULT);
         return;
     }
 
     // Ensures admin and client are in the same channel, sends an error message if they are not.
     if(origin->get_channel().compare(target->get_channel()) != 0) {
-        std::string error_msg(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
-        origin->send(error_msg);
+        origin->send(COLOR_MAGENTA + "server:" + COLOR_RED + " you must be in the same channel as \"" + nickname + "\" to do that!" + COLOR_DEFAULT);
         return;
     }
 
     // Sends a message telling the admin the IP of the target.
-    std::string kick_msg(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " the IP address of \"" + nickname + "\" is " + target->get_ip() + "!");
-    origin->send(kick_msg);
+    origin->send(COLOR_MAGENTA + "server:" + COLOR_DEFAULT + " the IP address of \"" + nickname + "\" is " + target->get_ip() + "!");
 
 }

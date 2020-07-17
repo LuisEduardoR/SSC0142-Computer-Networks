@@ -31,7 +31,8 @@
     # define COLOR_CYAN std::string("\033[0;36m")
     # define COLOR_BOLD_CYAN std::string("\033[1;36m")
 
-# else // If colors are not to be used define them to empty strings.
+/* If colors are not to be used define them to empty strings. */
+# else
 
     # define COLOR_DEFAULT std::string("");
     # define COLOR_RED std::string("");

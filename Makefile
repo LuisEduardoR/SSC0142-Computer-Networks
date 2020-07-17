@@ -11,14 +11,13 @@ LINKER_FLAGS = -lstdc++ -lpthread -lrt
 MAIN_SRC_DIR = ./src
 CLT_SRC_DIR = ./src/client
 SRV_SRC_DIR = ./src/server
-MSG_SRC_DIR = ./src/messaging
 
 # Final compiled executable name.
 OUTPUT = trabalho-redes
 
 # Compiles all object files and links them to make the final executable.
 all:
-	$(CC) $(MAIN_SRC_DIR)/*.cpp $(CLT_SRC_DIR)/*.cpp $(SRV_SRC_DIR)/*.cpp $(MSG_SRC_DIR)/*.cpp $(FLAGS) $(LINKER_FLAGS) -o $(OUTPUT)
+	$(CC) $(MAIN_SRC_DIR)/*.cpp $(CLT_SRC_DIR)/*.cpp $(SRV_SRC_DIR)/*.cpp $(FLAGS) $(LINKER_FLAGS) -o $(OUTPUT)
 
 # Tries running the compiled executable if it's name wasn't changed
 run:

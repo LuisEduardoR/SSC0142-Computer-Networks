@@ -8,6 +8,7 @@
 
 # include <string>
 
+// Used to identify the type of a request, i.e. what command it should execute.
 enum request_type { rt_Invalid, rt_Send, rt_Nickname, rt_Join, rt_Admin_kick, rt_Admin_mute, rt_Admin_unmute, rt_Admin_whois};
 
 class request

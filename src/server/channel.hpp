@@ -13,7 +13,8 @@
 
 # include <atomic>
 
-# define MAX_CHANNEL_NAME_SIZE 200 // Max size of a channel name.
+// Max size of a channel name.
+# define MAX_CHANNEL_NAME_SIZE 200
 
 // Headers for classes in other files that will be used bellow.
 class server;

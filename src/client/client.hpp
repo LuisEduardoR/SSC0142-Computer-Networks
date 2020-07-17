@@ -20,14 +20,6 @@ class client
 
     public: 
 
-        int network_socket;
-
-        std::mutex updating_messages;
-        std::queue<std::string> new_messages;
-
-        // If admin commands should be shown.
-        std::atomic_bool atmc_show_admin_commands;
-
         // CONSTRUCTOR
         client();
         // DESTRUCTOR
@@ -49,6 +41,14 @@ class client
 
         struct sockaddr_in server_address;
         int connection_status;
+
+        int network_socket;
+
+        std::mutex updating_messages;
+        std::queue<std::string> new_messages;
+
+        // If admin commands should be shown.
+        std::atomic_bool atmc_show_admin_commands;
 
 };
 
