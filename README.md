@@ -6,7 +6,7 @@ This is an assignment made by:
 
 For the SSC0142 - Computer Networks course during the 1st semester of 2020 at ICMC - University of São Paulo.
 
-The code was confirmed to work in a Fedora 32 Virtual Machine with the make and gcc packages updated to the newest stable version (2020-06-02).
+The code was confirmed to work in a Ubuntu 20.04 Virtual Machine with the make and gcc packages updated to the newest stable version (2020-07-18).
 
 The code can be compiled in a standard Linux system with the make and gcc packages by using the command:
 
